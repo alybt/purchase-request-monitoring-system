@@ -11,4 +11,4 @@ Route::get('/test-connection', function () {
     ]);
 });
 
-Route::post('/login', [AuthController::class,''])->middleware('throttle:login');
+Route::post('/login', [AuthController::class,'login'])->middleware('throttle:login');
