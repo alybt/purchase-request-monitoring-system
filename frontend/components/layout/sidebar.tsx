@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 export default function Sidebar() {
   const [isHovered, setIsHovered] = useState(false);
   const pathname = usePathname();
-  const router = useRouter(); // Initialize the router for redirection
+  const router = useRouter(); 
 
   const menuItems = [
     {
@@ -48,13 +48,9 @@ export default function Sidebar() {
     },
   ];
 
-  // Function to handle the logout process
   const handleLogout = () => {
-    // 1. Clear authentication data from local storage
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    
-    // 2. Redirect to the login page
     router.push("/");
   };
 
@@ -62,13 +58,12 @@ export default function Sidebar() {
     <aside
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`bg-gray-900 h-screen border-r border-gray-800 transition-all duration-300 ease-in-out flex flex-col z-40 relative ${
+      className={`bg-[#1a251f] h-screen border-r border-[#2b3c33] transition-all duration-300 ease-in-out flex flex-col z-40 relative ${
         isHovered ? "w-64" : "w-20"
       }`}
     >
       <div className="flex flex-col flex-1 py-6 overflow-hidden">
         
-        {/* Top Navigation Links */}
         <nav className="space-y-2 px-3 flex-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
@@ -78,8 +73,8 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center gap-4 px-3 py-3 rounded-lg transition-colors whitespace-nowrap ${
                   isActive
-                    ? "bg-gray-800 text-yellow-500"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                    ? "bg-[#0f1512] text-[#5db68d] border-l-2 border-[#5db68d]"
+                    : "text-gray-400 hover:bg-[#0f1512] hover:text-[#e2e8f0]"
                 }`}
               >
                 {item.icon}
@@ -95,13 +90,11 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom Action: Logout Button */}
         <div className="px-3 mt-auto">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-4 px-3 py-3 rounded-lg text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors whitespace-nowrap focus:outline-none"
+            className="w-full flex items-center gap-4 px-3 py-3 rounded-lg text-red-400 hover:bg-red-900/10 hover:text-red-300 transition-colors whitespace-nowrap focus:outline-none"
           >
-            {/* Logout Icon */}
             <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
