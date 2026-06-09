@@ -30,7 +30,11 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-[#1a251f] border-b border-[#2b3c33] sticky top-0 z-50 shadow-sm">
+    <header 
+      className={`border-b sticky top-0 z-50 shadow-sm transition-colors duration-300 ${
+        user ? "bg-white border-slate-200" : "bg-[#1a251f] border-[#2b3c33]"
+      }`}
+    >
       <div
         className={`w-full py-3 ${
           user ? "px-4 lg:px-10" : "px-4 sm:px-6 lg:px-25"
@@ -39,7 +43,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-4">
             {user && (
-              <button className="text-gray-400 hover:text-white focus:outline-none lg:hidden">
+              <button className="text-slate-500 hover:text-slate-900 focus:outline-none lg:hidden">
                 <svg
                   className="w-6 h-6"
                   fill="none"
@@ -60,26 +64,31 @@ export default function Header() {
               href={user ? "/dashboard" : "/"}
               className="flex-shrink-0 flex items-center gap-3"
             >
+              {/* Logo block remains the primary green in both themes for brand consistency */}
               <div className="w-8 h-8 rounded bg-[#3b825e] flex items-center justify-center shadow-sm">
                 <span className="text-white font-bold text-sm">PR</span>
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">
+              
+              {/* Text color changes based on auth state */}
+              <span className={`font-bold text-xl tracking-tight ${user ? "text-slate-900" : "text-white"}`}>
                 System<span className="text-[#e0a843]">.</span>
               </span>
             </Link>
           </div>
 
+          {/* User profile section (Only renders in light mode when logged in) */}
           {user && (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right mr-2">
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-bold text-slate-900">
                   {user.name || "Administrator"}
                 </p>
-                <p className="text-xs text-gray-400">{user.email}</p>
+                <p className="text-xs text-slate-500 font-medium">{user.email}</p>
               </div>
 
-              <div className="h-9 w-9 rounded-full bg-[#0f1512] flex items-center justify-center border border-[#2b3c33] hover:border-[#5db68d] cursor-pointer transition-all">
-                <span className="text-sm font-bold text-[#5db68d]">
+              {/* Light theme avatar using soft green and primary text */}
+              <div className="h-10 w-10 rounded-full bg-[#f0f9f4] flex items-center justify-center border border-[#5db68d]/30 hover:border-[#5db68d] cursor-pointer transition-all">
+                <span className="text-sm font-bold text-[#3b825e]">
                   {getInitial()}
                 </span>
               </div>
