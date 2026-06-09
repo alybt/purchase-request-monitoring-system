@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { login } from "@/services/auth.service";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -12,101 +13,61 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
+      const data = await login(email, password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Invalid credentials"
-        );
+      if (!data.token) {
+        throw new Error(data.message || "Invalid credentials");
       }
 
-      // Save user information
-      localStorage.setItem(
-        "token",
-        data.token
-      );
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(data.user)
-      );
-
-      // Redirect to dashboard
       router.push("/dashboard");
     } catch (err: any) {
-      setError(
-        err.message || "Something went wrong"
-      );
+      setError(err.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm text-center">
           {error}
         </div>
       )}
 
-      <div>
-        <label className="block mb-2 font-medium">
-          Email
+      <div className="space-y-1.5">
+        <label className="block text-sm font-semibold text-gray-700">
+          Email Address
         </label>
-
         <input
           type="email"
           value={email}
-          onChange={(e) =>
-            setEmail(e.target.value)
-          }
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Enter your email"
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all placeholder-gray-400 shadow-sm"
+          placeholder="name@company.com"
           required
         />
       </div>
 
-      <div>
-        <label className="block mb-2 font-medium">
+      <div className="space-y-1.5">
+        <label className="block text-sm font-semibold text-gray-700">
           Password
         </label>
-
         <input
           type="password"
           value={password}
-          onChange={(e) =>
-            setPassword(e.target.value)
-          }
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Enter your password"
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all placeholder-gray-400 shadow-sm"
+          placeholder="••••••••"
           required
         />
       </div>
@@ -114,11 +75,9 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+        className="w-full bg-amber-500 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-600 transition-colors duration-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-amber-500 mt-6 shadow-md"
       >
-        {loading
-          ? "Logging in..."
-          : "Login"}
+        {loading ? "Authenticating..." : "Sign In"}
       </button>
     </form>
   );
