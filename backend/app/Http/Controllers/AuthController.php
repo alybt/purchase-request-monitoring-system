@@ -27,6 +27,14 @@ class AuthController extends Controller
                     'message' => 'Invalid credentials.'
                 ], 401);
             }
+
+            // Check if user account is active
+            if ($user->status !== 'active') {
+                return response()->json([
+                    'message' => 'Your account is not active.'
+                ], 403);
+            }
+
             // 4. Create new token
             $token = $user->createToken('auth_token')->plainTextToken;
             // 5. Return response
@@ -34,11 +42,13 @@ class AuthController extends Controller
                 'message' => 'Logged in successfully.',
                 'user' => [
                     'id' => $user->id,
-                    'name' => trim(
-                        $user->first_name . ' ' .
-                        $user->last_name
-                    ),
+                    'first_name' => $user->first_name,
+                    'middle_name' => $user->middle_name,
+                    'last_name' => $user->last_name,
                     'email' => $user->email,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                    'department' => $user->department,
                 ],
                 'token' => $token
             ], 200);

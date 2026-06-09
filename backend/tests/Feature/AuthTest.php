@@ -93,4 +93,52 @@ class AuthTest extends TestCase
             'message'
         ]); 
     }
+
+    public function test_user_login_with_inactive_status_denied(): void {
+        $user = \App\Models\User::factory()->create([
+            'email' => 'inactive@example.com',
+            'password' => bcrypt('securepassword123'),
+            'status' => 'suspended',
+        ]);
+        $response = $this->postJson('/api/login',[
+            'email' => 'inactive@example.com',
+            'password' => 'securepassword123',
+        ]);
+        $response->assertStatus(403);
+        $response->assertJsonFragment([
+            'message' => 'Your account is not active.'
+        ]);
+    }
+
+    public function test_user_login_response_contains_expected_fields(): void {
+        $user = \App\Models\User::factory()->create([
+            'first_name' => 'Test',
+            'last_name' => 'User',
+            'email' => 'testuser@example.com',
+            'password' => bcrypt('securepassword123'),
+            'role' => 'admin',
+            'status' => 'active',
+            'department' => 'IT',
+        ]);
+        $response = $this->postJson('/api/login',[
+            'email' => 'testuser@example.com',
+            'password' => 'securepassword123',
+        ]);
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'token',
+            'user' => [
+                'id',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'email',
+                'role',
+                'status',
+                'department',
+            ],
+            'message'
+        ]);
+    }
 }
+
