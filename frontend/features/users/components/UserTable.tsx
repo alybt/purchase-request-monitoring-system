@@ -1,64 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import type { UserData } from "@/services/users.service";
 
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  role: "admin" | "approver" | "requester";
-  status: "active" | "inactive";
-  joinDate: string;
+interface UserTableProps {
+  data: UserData[];
+  selectedRows: string[];
+  onSelectRows: (ids: string[]) => void;
+  onView: (user: UserData) => void;
+  onEdit: (user: UserData) => void;
+  onDelete: (user: UserData) => void;
+  showCheckboxes: boolean;
 }
-
-const mockData: UserData[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@company.com",
-    department: "IT",
-    role: "admin",
-    status: "active",
-    joinDate: "2025-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane.smith@company.com",
-    department: "HR",
-    role: "approver",
-    status: "active",
-    joinDate: "2025-02-20",
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike.johnson@company.com",
-    department: "Finance",
-    role: "approver",
-    status: "active",
-    joinDate: "2025-03-10",
-  },
-  {
-    id: "4",
-    name: "Sarah Williams",
-    email: "sarah.williams@company.com",
-    department: "Operations",
-    role: "requester",
-    status: "inactive",
-    joinDate: "2025-01-05",
-  },
-  {
-    id: "5",
-    name: "Tom Brown",
-    email: "tom.brown@company.com",
-    department: "Marketing",
-    role: "requester",
-    status: "active",
-    joinDate: "2025-04-12",
-  },
-];
 
 const getRoleColor = (role: string) => {
   switch (role) {
@@ -84,23 +37,28 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export default function UserTable() {
-  const [data] = useState<UserData[]>(mockData);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-
+export default function UserTable({
+  data,
+  selectedRows,
+  onSelectRows,
+  onView,
+  onEdit,
+  onDelete,
+  showCheckboxes,
+}: UserTableProps) {
   const toggleSelectAll = () => {
     if (selectedRows.length === data.length) {
-      setSelectedRows([]);
+      onSelectRows([]);
     } else {
-      setSelectedRows(data.map((item) => item.id));
+      onSelectRows(data.map((item) => item.id));
     }
   };
 
   const toggleRow = (id: string) => {
     if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+      onSelectRows(selectedRows.filter((rowId) => rowId !== id));
     } else {
-      setSelectedRows([...selectedRows, id]);
+      onSelectRows([...selectedRows, id]);
     }
   };
 
@@ -109,14 +67,18 @@ export default function UserTable() {
       <table className="w-full">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50">
-            <th className="px-6 py-4 text-left">
-              <input
-                type="checkbox"
-                checked={selectedRows.length === data.length && data.length > 0}
-                onChange={toggleSelectAll}
-                className="rounded cursor-pointer"
-              />
-            </th>
+            {showCheckboxes && (
+              <th className="px-6 py-4 text-left">
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedRows.length === data.length && data.length > 0
+                  }
+                  onChange={toggleSelectAll}
+                  className="rounded cursor-pointer"
+                />
+              </th>
+            )}
             <th className="px-6 py-4 text-left text-sm font-semibold text-secondary">
               Name
             </th>
@@ -144,16 +106,22 @@ export default function UserTable() {
           {data.map((row) => (
             <tr
               key={row.id}
-              className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
+              className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
+                showCheckboxes && selectedRows.includes(row.id)
+                  ? "bg-blue-50"
+                  : ""
+              }`}
             >
-              <td className="px-6 py-4">
-                <input
-                  type="checkbox"
-                  checked={selectedRows.includes(row.id)}
-                  onChange={() => toggleRow(row.id)}
-                  className="rounded cursor-pointer"
-                />
-              </td>
+              {showCheckboxes && (
+                <td className="px-6 py-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.includes(row.id)}
+                    onChange={() => toggleRow(row.id)}
+                    className="rounded cursor-pointer"
+                  />
+                </td>
+              )}
               <td className="px-6 py-4 text-sm font-medium text-secondary">
                 {row.name}
               </td>
@@ -181,9 +149,31 @@ export default function UserTable() {
                 {row.joinDate}
               </td>
               <td className="px-6 py-4 text-sm">
-                <button className="text-primary hover:text-primary/80 font-medium transition-colors">
-                  Edit
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onView(row)}
+                    className="text-primary hover:text-primary/80 font-medium transition-colors"
+                    title="View user details"
+                  >
+                    View
+                  </button>
+                  <span className="text-slate-200">|</span>
+                  <button
+                    onClick={() => onEdit(row)}
+                    className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    title="Edit user"
+                  >
+                    Edit
+                  </button>
+                  <span className="text-slate-200">|</span>
+                  <button
+                    onClick={() => onDelete(row)}
+                    className="text-red-600 hover:text-red-700 font-medium transition-colors"
+                    title="Delete user"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

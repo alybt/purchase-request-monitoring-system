@@ -18,10 +18,10 @@ export default function DeleteUserModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 shrink-0">
           <h2 className="text-lg font-bold text-red-600">Delete User(s)</h2>
           <button
             onClick={onClose}

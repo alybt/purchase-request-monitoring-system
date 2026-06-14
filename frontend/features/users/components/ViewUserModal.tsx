@@ -1,14 +1,6 @@
 "use client";
 
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  role: "admin" | "approver" | "requester";
-  status: "active" | "inactive";
-  joinDate: string;
-}
+import type { UserData } from "@/services/users.service";
 
 interface ViewUserModalProps {
   isOpen: boolean;
@@ -48,10 +40,10 @@ export default function ViewUserModal({
   if (!isOpen || !user) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 shrink-0">
           <h2 className="text-lg font-bold text-secondary">User Details</h2>
           <button
             onClick={onClose}
@@ -74,7 +66,7 @@ export default function ViewUserModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Name */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">

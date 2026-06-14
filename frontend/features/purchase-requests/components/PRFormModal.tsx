@@ -88,10 +88,10 @@ export default function PRFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 sticky top-0 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 shrink-0">
           <h2 className="text-lg font-bold text-secondary">
             {isEditMode
               ? "Edit Purchase Request"
@@ -118,172 +118,171 @@ export default function PRFormModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* PR Number (Read-only in edit mode) */}
-          {isEditMode && formData.prNumber && (
-            <div>
-              <label className="block text-sm font-semibold text-secondary mb-2">
-                PR Number
-              </label>
-              <input
-                type="text"
-                value={formData.prNumber}
-                disabled
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-secondary/70 cursor-not-allowed"
-              />
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          {/* Scrollable Form Content */}
+          <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-4">
+            {/* PR Number (Read-only in edit mode) */}
+            {isEditMode && formData.prNumber && (
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  PR Number
+                </label>
+                <input
+                  type="text"
+                  value={formData.prNumber}
+                  disabled
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-secondary/70 cursor-not-allowed"
+                />
+              </div>
+            )}
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Department */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Department */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Department
+                </label>
+                <select
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                >
+                  {departments.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+                {errors.department && (
+                  <p className="text-red-500 text-xs mt-1">{errors.department}</p>
+                )}
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Amount (₱)
+                </label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount || ""}
+                  onChange={handleChange}
+                  placeholder="0"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.amount
+                      ? "border-red-500 focus:ring-red-500/50"
+                      : "border-slate-200 focus:ring-primary/50"
+                    }`}
+                />
+                {errors.amount && (
+                  <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Description */}
             <div>
               <label className="block text-sm font-semibold text-secondary mb-2">
-                Department
+                Description
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Enter purchase request description"
+                rows={3}
+                className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 resize-none ${errors.description
+                    ? "border-red-500 focus:ring-red-500/50"
+                    : "border-slate-200 focus:ring-primary/50"
+                  }`}
+              />
+              {errors.description && (
+                <p className="text-red-500 text-xs mt-1">{errors.description}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Requested By */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Requested By
+                </label>
+                <input
+                  type="text"
+                  name="requestedBy"
+                  value={formData.requestedBy}
+                  onChange={handleChange}
+                  placeholder="Enter name"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.requestedBy
+                      ? "border-red-500 focus:ring-red-500/50"
+                      : "border-slate-200 focus:ring-primary/50"
+                    }`}
+                />
+                {errors.requestedBy && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.requestedBy}
+                  </p>
+                )}
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  name="dueDate"
+                  value={formData.dueDate}
+                  onChange={handleChange}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.dueDate
+                      ? "border-red-500 focus:ring-red-500/50"
+                      : "border-slate-200 focus:ring-primary/50"
+                    }`}
+                />
+                {errors.dueDate && (
+                  <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-2">
+                Status
               </label>
               <select
-                name="department"
-                value={formData.department}
+                name="status"
+                value={formData.status}
                 onChange={handleChange}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
               >
-                {departments.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="completed">Completed</option>
               </select>
-              {errors.department && (
-                <p className="text-red-500 text-xs mt-1">{errors.department}</p>
-              )}
             </div>
 
-            {/* Amount */}
+            {/* Notes */}
             <div>
               <label className="block text-sm font-semibold text-secondary mb-2">
-                Amount (₱)
+                Notes (Optional)
               </label>
-              <input
-                type="number"
-                name="amount"
-                value={formData.amount || ""}
+              <textarea
+                name="notes"
+                value={formData.notes || ""}
                 onChange={handleChange}
-                placeholder="0"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                  errors.amount
-                    ? "border-red-500 focus:ring-red-500/50"
-                    : "border-slate-200 focus:ring-primary/50"
-                }`}
+                placeholder="Add any additional notes"
+                rows={2}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
               />
-              {errors.amount && (
-                <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
-              )}
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              placeholder="Enter purchase request description"
-              rows={3}
-              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none ${
-                errors.description
-                  ? "border-red-500 focus:ring-red-500/50"
-                  : "border-slate-200 focus:ring-primary/50"
-              }`}
-            />
-            {errors.description && (
-              <p className="text-red-500 text-xs mt-1">{errors.description}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Requested By */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary mb-2">
-                Requested By
-              </label>
-              <input
-                type="text"
-                name="requestedBy"
-                value={formData.requestedBy}
-                onChange={handleChange}
-                placeholder="Enter name"
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                  errors.requestedBy
-                    ? "border-red-500 focus:ring-red-500/50"
-                    : "border-slate-200 focus:ring-primary/50"
-                }`}
-              />
-              {errors.requestedBy && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.requestedBy}
-                </p>
-              )}
-            </div>
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary mb-2">
-                Due Date
-              </label>
-              <input
-                type="date"
-                name="dueDate"
-                value={formData.dueDate}
-                onChange={handleChange}
-                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                  errors.dueDate
-                    ? "border-red-500 focus:ring-red-500/50"
-                    : "border-slate-200 focus:ring-primary/50"
-                }`}
-              />
-              {errors.dueDate && (
-                <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">
-              Status
-            </label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
-            >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-semibold text-secondary mb-2">
-              Notes (Optional)
-            </label>
-            <textarea
-              name="notes"
-              value={formData.notes || ""}
-              onChange={handleChange}
-              placeholder="Add any additional notes"
-              rows={2}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-            />
-          </div>
-
-          {/* Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-slate-200">
+          {/* Footer Buttons */}
+          <div className="px-6 py-4 border-t border-slate-200 shrink-0 flex gap-3">
             <button
               type="button"
               onClick={onClose}

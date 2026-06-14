@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import UserTableWithActions from "@/features/users/components/UserTableWithActions";
-import UserFormModal from "@/features/users/components/UserFormModal";
+import UserTableWithActions from "@/features/users/components/UserTable";
+import UserFormModal from "@/features/users/components/AddUserModal";
 import ViewUserModal from "@/features/users/components/ViewUserModal";
 import DeleteUserModal from "@/features/users/components/DeleteUserModal";
 import {
@@ -13,6 +13,7 @@ import {
   bulkDeleteUsers,
   UserData,
 } from "@/services/users.service";
+import type { UserFormData } from "@/features/users/components/AddUserModal";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserData[]>([]);
@@ -119,15 +120,13 @@ export default function UsersPage() {
   };
 
   // Handle Form Submit
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (data: UserFormData) => {
     setError("");
     try {
       if (isEditMode && editingUser) {
         const updated = await updateUser(editingUser.id, data);
         setUsers(
-          users.map((user) =>
-            user.id === editingUser.id ? updated : user
-          )
+          users.map((user) => (user.id === editingUser.id ? updated : user)),
         );
       } else {
         const created = await createUser(data);
@@ -287,7 +286,9 @@ export default function UsersPage() {
         {showFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl transition-all">
             <div>
-              <label className="block text-xs font-semibold text-secondary mb-1">Role</label>
+              <label className="block text-xs font-semibold text-secondary mb-1">
+                Role
+              </label>
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
@@ -300,7 +301,9 @@ export default function UsersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-secondary mb-1">Status</label>
+              <label className="block text-xs font-semibold text-secondary mb-1">
+                Status
+              </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -312,15 +315,26 @@ export default function UsersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-secondary mb-1">Department</label>
+              <label className="block text-xs font-semibold text-secondary mb-1">
+                Department
+              </label>
               <select
                 value={deptFilter}
                 onChange={(e) => setDeptFilter(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white text-secondary"
               >
                 <option value="">All Departments</option>
-                {["IT", "HR", "Finance", "Operations", "Marketing", "Sales"].map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
+                {[
+                  "IT",
+                  "HR",
+                  "Finance",
+                  "Operations",
+                  "Marketing",
+                  "Sales",
+                ].map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
                 ))}
               </select>
             </div>
@@ -330,11 +344,28 @@ export default function UsersPage() {
         {/* Loading Spinner */}
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center">
-            <svg className="animate-spin h-8 w-8 text-primary mb-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <svg
+              className="animate-spin h-8 w-8 text-primary mb-2"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
-            <span className="text-sm text-slate-400 font-medium">Fetching users from database...</span>
+            <span className="text-sm text-slate-400 font-medium">
+              Fetching users from database...
+            </span>
           </div>
         ) : (
           /* Feature Component */

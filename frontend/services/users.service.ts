@@ -1,10 +1,11 @@
 const API_URL = "http://127.0.0.1:8000/api";
 
 function getHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return {
     "Content-Type": "application/json",
-    "Accept": "application/json",
+    Accept: "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
@@ -23,6 +24,9 @@ export interface UserResponse {
 
 export interface UserData {
   id: string;
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
   name: string;
   email: string;
   department: string;
@@ -32,9 +36,16 @@ export interface UserData {
 }
 
 export function mapBackendUserToFrontend(user: UserResponse): UserData {
+  const fullName = [user.first_name, user.middle_name, user.last_name]
+    .filter(Boolean)
+    .join(" ");
+
   return {
     id: String(user.id),
-    name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+    first_name: user.first_name,
+    middle_name: user.middle_name || null,
+    last_name: user.last_name,
+    name: fullName,
     email: user.email,
     department: user.department || "",
     role: user.role === "employee" ? "requester" : user.role,
@@ -43,18 +54,12 @@ export function mapBackendUserToFrontend(user: UserResponse): UserData {
   };
 }
 
-export function splitFullName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  let first_name = parts[0] || "";
-  let last_name = "";
-  if (parts.length > 1) {
-    last_name = parts.pop() || "";
-    first_name = parts.join(" ");
-  }
-  return { first_name, last_name };
-}
-
-export async function getUsers(search = "", role = "", status = "", department = ""): Promise<UserData[]> {
+export async function getUsers(
+  search = "",
+  role = "",
+  status = "",
+  department = "",
+): Promise<UserData[]> {
   const params = new URLSearchParams();
   if (search) params.append("search", search);
   if (role) {
@@ -81,8 +86,15 @@ export async function getUsers(search = "", role = "", status = "", department =
   return (data.users || []).map(mapBackendUserToFrontend);
 }
 
-export async function createUser(data: { name: string; email: string; department: string; role: string; status: string }): Promise<UserData> {
-  const { first_name, last_name } = splitFullName(data.name);
+export async function createUser(data: {
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
+  email: string;
+  department: string;
+  role: string;
+  status: string;
+}): Promise<UserData> {
   const backendRole = data.role === "requester" ? "employee" : data.role;
   const backendStatus = data.status === "inactive" ? "suspended" : data.status;
 
@@ -90,8 +102,9 @@ export async function createUser(data: { name: string; email: string; department
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({
-      first_name,
-      last_name,
+      first_name: data.first_name,
+      middle_name: data.middle_name || null,
+      last_name: data.last_name,
       email: data.email,
       department: data.department,
       role: backendRole,
@@ -109,8 +122,18 @@ export async function createUser(data: { name: string; email: string; department
   return mapBackendUserToFrontend(resData.user);
 }
 
-export async function updateUser(id: string, data: { name: string; email: string; department: string; role: string; status: string }): Promise<UserData> {
-  const { first_name, last_name } = splitFullName(data.name);
+export async function updateUser(
+  id: string,
+  data: {
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+    email: string;
+    department: string;
+    role: string;
+    status: string;
+  },
+): Promise<UserData> {
   const backendRole = data.role === "requester" ? "employee" : data.role;
   const backendStatus = data.status === "inactive" ? "suspended" : data.status;
 
@@ -118,8 +141,9 @@ export async function updateUser(id: string, data: { name: string; email: string
     method: "PUT",
     headers: getHeaders(),
     body: JSON.stringify({
-      first_name,
-      last_name,
+      first_name: data.first_name,
+      middle_name: data.middle_name || null,
+      last_name: data.last_name,
       email: data.email,
       department: data.department,
       role: backendRole,

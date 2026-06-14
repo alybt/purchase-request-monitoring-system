@@ -71,10 +71,10 @@ export default function ViewPRModal({
   const isPending = pr.status === "pending";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 sticky top-0 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 shrink-0 sticky top-0 bg-white">
           <h2 className="text-lg font-bold text-secondary">
             Purchase Request Details
           </h2>
@@ -198,11 +198,20 @@ export default function ViewPRModal({
                   </thead>
                   <tbody>
                     {pr.lineItems.map((item: any) => (
-                      <tr key={item.id} className="border-b border-slate-200 text-secondary last:border-b-0">
-                        <td className="px-4 py-2 font-medium">{item.item_name}</td>
+                      <tr
+                        key={item.id}
+                        className="border-b border-slate-200 text-secondary last:border-b-0"
+                      >
+                        <td className="px-4 py-2 font-medium">
+                          {item.item_name}
+                        </td>
                         <td className="px-4 py-2">{item.quantity}</td>
-                        <td className="px-4 py-2">₱{parseFloat(item.unit_price).toLocaleString()}</td>
-                        <td className="px-4 py-2 font-semibold">₱{parseFloat(item.total_price).toLocaleString()}</td>
+                        <td className="px-4 py-2">
+                          ₱{parseFloat(item.unit_price).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 font-semibold">
+                          ₱{parseFloat(item.total_price).toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -219,14 +228,21 @@ export default function ViewPRModal({
               </p>
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 {pr.approvals.map((app: any) => (
-                  <div key={app.id} className="text-xs text-secondary border-b border-slate-200 pb-2 last:border-b-0 last:pb-0">
+                  <div
+                    key={app.id}
+                    className="text-xs text-secondary border-b border-slate-200 pb-2 last:border-b-0 last:pb-0"
+                  >
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-semibold text-slate-800">
                         {app.approver?.first_name} {app.approver?.last_name}
                       </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase ${
-                        app.status === "Approve" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase ${
+                          app.status === "Approve"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
                         {app.status === "Approve" ? "Approved" : "Rejected"}
                       </span>
                     </div>
