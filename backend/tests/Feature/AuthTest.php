@@ -140,5 +140,65 @@ class AuthTest extends TestCase
             'message'
         ]);
     }
+
+    public function test_user_can_get_current_user_profile(): void {
+        $user = \App\Models\User::factory()->create([
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => 'john@example.com',
+            'role' => 'admin',
+            'status' => 'active',
+            'department' => 'IT',
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/me');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'user' => [
+                'id' => $user->id,
+                'first_name' => 'John',
+                'middle_name' => $user->middle_name,
+                'last_name' => 'Doe',
+                'email' => 'john@example.com',
+                'role' => 'admin',
+                'status' => 'active',
+                'department' => 'IT',
+            ]
+        ]);
+    }
+
+    public function test_user_cannot_get_current_user_profile_unauthenticated(): void {
+        $response = $this->getJson('/api/me');
+        $response->assertStatus(401);
+    }
+
+    public function test_user_can_logout(): void {
+        $user = \App\Models\User::factory()->create([
+            'email' => 'john@example.com',
+            'status' => 'active',
+        ]);
+
+        // Generate a token
+        $token = $user->createToken('test_token')->plainTextToken;
+
+        // Perform request with the token in Authorization header
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/logout');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'message' => 'Logged out successfully.'
+        ]);
+
+        // Assert that the token was deleted/revoked
+        $this->assertCount(0, $user->tokens);
+    }
+
+    public function test_user_cannot_logout_unauthenticated(): void {
+        $response = $this->postJson('/api/logout');
+        $response->assertStatus(401);
+    }
 }
 

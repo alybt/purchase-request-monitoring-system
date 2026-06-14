@@ -1,101 +1,31 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import PRTableWithActions from "@/features/purchase-requests/components/PRTableWithActions";
 import PRFormModal from "@/features/purchase-requests/components/PRFormModal";
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
 import DeletePRModal from "@/features/purchase-requests/components/DeletePRModal";
-
-interface PRData {
-  id: string;
-  prNumber: string;
-  department: string;
-  amount: number;
-  status: "pending" | "approved" | "rejected" | "completed";
-  requestedBy: string;
-  dateRequested: string;
-  dueDate: string;
-  description?: string;
-  notes?: string;
-}
-
-const mockData: PRData[] = [
-  {
-    id: "1",
-    prNumber: "PR-2026-001",
-    department: "IT",
-    amount: 50000,
-    status: "pending",
-    requestedBy: "John Doe",
-    dateRequested: "2026-06-01",
-    dueDate: "2026-06-15",
-    description: "Server hardware upgrade",
-  },
-  {
-    id: "2",
-    prNumber: "PR-2026-002",
-    department: "HR",
-    amount: 25000,
-    status: "approved",
-    requestedBy: "Jane Smith",
-    dateRequested: "2026-05-28",
-    dueDate: "2026-06-10",
-    description: "Employee training program",
-  },
-  {
-    id: "3",
-    prNumber: "PR-2026-003",
-    department: "Finance",
-    amount: 75000,
-    status: "pending",
-    requestedBy: "Mike Johnson",
-    dateRequested: "2026-06-02",
-    dueDate: "2026-06-20",
-    description: "Audit software subscription",
-  },
-  {
-    id: "4",
-    prNumber: "PR-2026-004",
-    department: "Operations",
-    amount: 35000,
-    status: "completed",
-    requestedBy: "Sarah Williams",
-    dateRequested: "2026-05-15",
-    dueDate: "2026-06-01",
-    description: "Office furniture",
-  },
-  {
-    id: "5",
-    prNumber: "PR-2026-005",
-    department: "Marketing",
-    amount: 45000,
-    status: "rejected",
-    requestedBy: "Tom Brown",
-    dateRequested: "2026-06-03",
-    dueDate: "2026-06-18",
-    description: "Advertising campaign",
-  },
-  {
-    id: "6",
-    prNumber: "PR-2026-006",
-    department: "IT",
-    amount: 60000,
-    status: "approved",
-    requestedBy: "John Doe",
-    dateRequested: "2026-06-04",
-    dueDate: "2026-06-22",
-    description: "Network infrastructure upgrade",
-  },
-];
+import {
+  getPurchaseRequests,
+  getPurchaseRequestDetails,
+  createPurchaseRequest,
+  updatePurchaseRequest,
+  deletePurchaseRequest,
+  bulkDeletePurchaseRequests,
+  approvePurchaseRequest,
+  rejectPurchaseRequest,
+  PRData,
+} from "@/services/purchase-requests.service";
 
 export default function PurchaseRequestsPage() {
-  const [prs, setPRs] = useState<PRData[]>(mockData);
+  const [prs, setPRs] = useState<PRData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "pending" | "completed">(
-    "all",
-  );
+  const [activeTab, setActiveTab] = useState<"all" | "pending" | "completed">("all");
 
   // Modal states
   const [showFormModal, setShowFormModal] = useState(false);
@@ -106,6 +36,27 @@ export default function PurchaseRequestsPage() {
   const [viewingPR, setViewingPR] = useState<PRData | null>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const fetchPRs = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getPurchaseRequests(searchTerm, "", "");
+      setPRs(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch purchase requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchPRs();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   // Filter and search logic
   const filteredPRs = useMemo(() => {
@@ -118,19 +69,8 @@ export default function PurchaseRequestsPage() {
       filtered = filtered.filter((pr) => pr.status === "completed");
     }
 
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (pr) =>
-          pr.prNumber.toLowerCase().includes(lowerSearchTerm) ||
-          pr.department.toLowerCase().includes(lowerSearchTerm) ||
-          pr.requestedBy.toLowerCase().includes(lowerSearchTerm),
-      );
-    }
-
     return filtered;
-  }, [prs, activeTab, searchTerm]);
+  }, [prs, activeTab]);
 
   // Handle Add PR
   const handleAddPR = () => {
@@ -147,9 +87,14 @@ export default function PurchaseRequestsPage() {
   };
 
   // Handle View PR
-  const handleViewPR = (pr: PRData) => {
-    setViewingPR(pr);
-    setShowViewModal(true);
+  const handleViewPR = async (pr: PRData) => {
+    try {
+      const details = await getPurchaseRequestDetails(pr.id);
+      setViewingPR(details);
+      setShowViewModal(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch purchase request details.");
+    }
   };
 
   // Handle Delete Single PR
@@ -166,30 +111,62 @@ export default function PurchaseRequestsPage() {
   };
 
   // Confirm Delete
-  const handleConfirmDelete = () => {
-    setPRs(prs.filter((pr) => !selectedRows.includes(pr.id)));
-    setSelectedRows([]);
-    setShowDeleteModal(false);
-    setIsDeleteMode(false);
+  const handleConfirmDelete = async () => {
+    try {
+      if (selectedRows.length > 1) {
+        await bulkDeletePurchaseRequests(selectedRows);
+        setPRs(prs.filter((pr) => !selectedRows.includes(pr.id)));
+      } else if (selectedRows.length === 1) {
+        await deletePurchaseRequest(selectedRows[0]);
+        setPRs(prs.filter((pr) => pr.id !== selectedRows[0]));
+      }
+      setSelectedRows([]);
+      setShowDeleteModal(false);
+      setIsDeleteMode(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete purchase request(s).");
+      setShowDeleteModal(false);
+    }
   };
 
   // Handle Form Submit
-  const handleFormSubmit = (data: any) => {
-    if (isEditMode && editingPR) {
-      setPRs(
-        prs.map((pr) => (pr.id === editingPR.id ? { ...pr, ...data } : pr)),
-      );
-    } else {
-      const newPR: PRData = {
-        ...data,
-        id: String(prs.length + 1),
-        prNumber: `PR-2026-${String(prs.length + 1).padStart(3, "0")}`,
-        dateRequested: new Date().toISOString().split("T")[0],
-      };
-      setPRs([...prs, newPR]);
+  const handleFormSubmit = async (data: any) => {
+    try {
+      if (isEditMode && editingPR) {
+        const updated = await updatePurchaseRequest(editingPR.id, data);
+        setPRs(prs.map((pr) => (pr.id === editingPR.id ? updated : pr)));
+      } else {
+        const created = await createPurchaseRequest(data);
+        setPRs([created, ...prs]);
+      }
+      setShowFormModal(false);
+      setEditingPR(null);
+    } catch (err: any) {
+      setError(err.message || "Operation failed.");
+      setShowFormModal(false);
     }
-    setShowFormModal(false);
-    setEditingPR(null);
+  };
+
+  const handleApprove = async (id: string, comments: string) => {
+    try {
+      await approvePurchaseRequest(id, comments);
+      const updated = await getPurchaseRequestDetails(id);
+      setPRs(prs.map((pr) => (pr.id === id ? updated : pr)));
+      setViewingPR(updated);
+    } catch (err: any) {
+      alert(err.message || "Approval failed.");
+    }
+  };
+
+  const handleReject = async (id: string, comments: string) => {
+    try {
+      await rejectPurchaseRequest(id, comments);
+      const updated = await getPurchaseRequestDetails(id);
+      setPRs(prs.map((pr) => (pr.id === id ? updated : pr)));
+      setViewingPR(updated);
+    } catch (err: any) {
+      alert(err.message || "Rejection failed.");
+    }
   };
 
   const handleToggleDeleteMode = () => {
@@ -221,7 +198,21 @@ export default function PurchaseRequestsPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button className="border border-slate-200 text-secondary bg-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm">
+          <button
+            onClick={() => {
+              const csvContent = "data:text/csv;charset=utf-8," 
+                + "PR Number,Department,Amount,Status,Requested By,Date Requested,Due Date\n"
+                + prs.map(e => `"${e.prNumber}","${e.department}",${e.amount},"${e.status}","${e.requestedBy}","${e.dateRequested}","${e.dueDate}"`).join("\n");
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement("a");
+              link.setAttribute("href", encodedUri);
+              link.setAttribute("download", "purchase_requests_export.csv");
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="border border-slate-200 text-secondary bg-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm"
+          >
             Export List
           </button>
           <button
@@ -245,6 +236,13 @@ export default function PurchaseRequestsPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm relative">
+          <span className="font-semibold">Error: </span>
+          {error}
+        </div>
+      )}
 
       {/* Main Content Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -304,21 +302,14 @@ export default function PurchaseRequestsPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button className="flex-1 sm:flex-none border border-slate-200 text-secondary bg-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center gap-2">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                />
+            <button
+              onClick={fetchPRs}
+              className="flex-1 sm:flex-none border border-slate-200 text-secondary bg-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 10H18.21" />
               </svg>
-              Filter
+              Refresh
             </button>
 
             <button
@@ -365,16 +356,27 @@ export default function PurchaseRequestsPage() {
           </div>
         </div>
 
-        {/* Feature Component */}
-        <PRTableWithActions
-          data={filteredPRs}
-          selectedRows={selectedRows}
-          onSelectRows={setSelectedRows}
-          onView={handleViewPR}
-          onEdit={handleEditPR}
-          onDelete={handleDeletePR}
-          showCheckboxes={isDeleteMode}
-        />
+        {/* Loading Spinner */}
+        {loading ? (
+          <div className="py-12 flex flex-col items-center justify-center">
+            <svg className="animate-spin h-8 w-8 text-primary mb-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-slate-400 font-medium">Fetching requests from database...</span>
+          </div>
+        ) : (
+          /* Feature Component */
+          <PRTableWithActions
+            data={filteredPRs}
+            selectedRows={selectedRows}
+            onSelectRows={setSelectedRows}
+            onView={handleViewPR}
+            onEdit={handleEditPR}
+            onDelete={handleDeletePR}
+            showCheckboxes={isDeleteMode}
+          />
+        )}
       </div>
 
       {/* Modals */}
@@ -407,6 +409,8 @@ export default function PurchaseRequestsPage() {
         isOpen={showViewModal}
         pr={viewingPR}
         onClose={() => setShowViewModal(false)}
+        onApprove={handleApprove}
+        onReject={handleReject}
       />
 
       <DeletePRModal
