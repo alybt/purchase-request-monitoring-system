@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PurchaseRequestController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -34,4 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);
     Route::post('/purchase-requests/{id}/approve', [PurchaseRequestController::class, 'approve']);
     Route::post('/purchase-requests/{id}/reject', [PurchaseRequestController::class, 'reject']);
+
+    Route::get('/dashboard/metrics', [DashboardController::class, 'metrics']);
+    Route::get('/dashboard/recent-prs', [DashboardController::class, 'recentPrs']);
+    Route::get('/dashboard/pending-approvals', [DashboardController::class, 'pendingApprovals']);
 });
