@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PurchaseRequestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -24,4 +25,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::post('/users/bulk-delete', [UserController::class, 'bulkDestroy']);
+
+    Route::get('/purchase-requests', [PurchaseRequestController::class, 'index']);
+    Route::post('/purchase-requests', [PurchaseRequestController::class, 'store']);
+    Route::get('/purchase-requests/{id}', [PurchaseRequestController::class, 'show']);
+    Route::put('/purchase-requests/{id}', [PurchaseRequestController::class, 'update']);
+    Route::delete('/purchase-requests/{id}', [PurchaseRequestController::class, 'destroy']);
+    Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);
+    Route::post('/purchase-requests/{id}/approve', [PurchaseRequestController::class, 'approve']);
+    Route::post('/purchase-requests/{id}/reject', [PurchaseRequestController::class, 'reject']);
 });
