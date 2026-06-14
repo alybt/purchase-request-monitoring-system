@@ -1,5 +1,3 @@
-import LoginPage from "@/features/auth/LoginPage";
+import LoginPage from "@/app/page";
 
-export default function Page() {
-    return <LoginPage />;
-}
+export default LoginPage;

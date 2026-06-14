@@ -89,15 +89,12 @@ export default function Sidebar() {
   ];
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("token");
-
-    await fetch("http://localhost:8000/api/logout", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
+    try {
+      const { logout } = await import("@/services/auth.service");
+      await logout();
+    } catch (e) {
+      console.error("Logout error", e);
+    }
 
     localStorage.removeItem("token");
     localStorage.removeItem("user");

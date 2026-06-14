@@ -1,73 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import UserTableWithActions from "@/features/users/components/UserTableWithActions";
 import UserFormModal from "@/features/users/components/UserFormModal";
 import ViewUserModal from "@/features/users/components/ViewUserModal";
 import DeleteUserModal from "@/features/users/components/DeleteUserModal";
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  role: "admin" | "approver" | "requester";
-  status: "active" | "inactive";
-  joinDate: string;
-}
-
-const mockData: UserData[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@company.com",
-    department: "IT",
-    role: "admin",
-    status: "active",
-    joinDate: "2025-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane.smith@company.com",
-    department: "HR",
-    role: "approver",
-    status: "active",
-    joinDate: "2025-02-20",
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    email: "mike.johnson@company.com",
-    department: "Finance",
-    role: "approver",
-    status: "active",
-    joinDate: "2025-03-10",
-  },
-  {
-    id: "4",
-    name: "Sarah Williams",
-    email: "sarah.williams@company.com",
-    department: "Operations",
-    role: "requester",
-    status: "inactive",
-    joinDate: "2025-01-05",
-  },
-  {
-    id: "5",
-    name: "Tom Brown",
-    email: "tom.brown@company.com",
-    department: "Marketing",
-    role: "requester",
-    status: "active",
-    joinDate: "2025-04-12",
-  },
-];
+import {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  bulkDeleteUsers,
+  UserData,
+} from "@/services/users.service";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserData[]>(mockData);
+  const [users, setUsers] = useState<UserData[]>([]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Filters state
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Modal states
   const [showFormModal, setShowFormModal] = useState(false);
@@ -79,6 +38,27 @@ export default function UsersPage() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
+
+  const fetchUsersData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getUsers(search, roleFilter, statusFilter, deptFilter);
+      setUsers(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load users from server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchUsersData();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, roleFilter, statusFilter, deptFilter]);
 
   // Handle Add User
   const handleAddUser = () => {
@@ -115,32 +95,50 @@ export default function UsersPage() {
   };
 
   // Confirm Delete
-  const handleConfirmDelete = () => {
-    setUsers(users.filter((user) => !selectedRows.includes(user.id)));
-    setSelectedRows([]);
-    setShowDeleteModal(false);
-    setIsDeleteMode(false);
-    setUserToDelete(null);
+  const handleConfirmDelete = async () => {
+    setError("");
+    try {
+      if (selectedRows.length > 1) {
+        await bulkDeleteUsers(selectedRows);
+        setUsers(users.filter((user) => !selectedRows.includes(user.id)));
+      } else if (selectedRows.length === 1) {
+        await deleteUser(selectedRows[0]);
+        setUsers(users.filter((user) => user.id !== selectedRows[0]));
+      } else if (userToDelete) {
+        await deleteUser(userToDelete.id);
+        setUsers(users.filter((user) => user.id !== userToDelete.id));
+      }
+      setSelectedRows([]);
+      setShowDeleteModal(false);
+      setIsDeleteMode(false);
+      setUserToDelete(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete selected user(s).");
+      setShowDeleteModal(false);
+    }
   };
 
   // Handle Form Submit
-  const handleFormSubmit = (data: any) => {
-    if (isEditMode && editingUser) {
-      setUsers(
-        users.map((user) =>
-          user.id === editingUser.id ? { ...user, ...data } : user,
-        ),
-      );
-    } else {
-      const newUser: UserData = {
-        ...data,
-        id: String(users.length + 1),
-        joinDate: new Date().toISOString().split("T")[0],
-      };
-      setUsers([...users, newUser]);
+  const handleFormSubmit = async (data: any) => {
+    setError("");
+    try {
+      if (isEditMode && editingUser) {
+        const updated = await updateUser(editingUser.id, data);
+        setUsers(
+          users.map((user) =>
+            user.id === editingUser.id ? updated : user
+          )
+        );
+      } else {
+        const created = await createUser(data);
+        setUsers([created, ...users]);
+      }
+      setShowFormModal(false);
+      setEditingUser(null);
+    } catch (err: any) {
+      setError(err.message || "Operation failed.");
+      setShowFormModal(false);
     }
-    setShowFormModal(false);
-    setEditingUser(null);
   };
 
   const handleToggleDeleteMode = () => {
@@ -182,6 +180,13 @@ export default function UsersPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm relative">
+          <span className="font-semibold">Error: </span>
+          {error}
+        </div>
+      )}
+
       {/* Main Content Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         {/* Toolbar (Search & Filter) */}
@@ -202,13 +207,22 @@ export default function UsersPage() {
             </svg>
             <input
               type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search users by name or email..."
               className="w-full border border-slate-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary placeholder-slate-400"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button className="flex-1 sm:flex-none border border-slate-200 text-secondary bg-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex-1 sm:flex-none border px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
+                showFilters || roleFilter || statusFilter || deptFilter
+                  ? "border-primary/50 bg-primary/5 text-primary"
+                  : "border-slate-200 text-secondary bg-white hover:bg-slate-50"
+              }`}
+            >
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -269,16 +283,71 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* Feature Component */}
-        <UserTableWithActions
-          data={users}
-          selectedRows={selectedRows}
-          onSelectRows={setSelectedRows}
-          onView={handleViewUser}
-          onEdit={handleEditUser}
-          onDelete={handleDeleteUser}
-          showCheckboxes={isDeleteMode}
-        />
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl transition-all">
+            <div>
+              <label className="block text-xs font-semibold text-secondary mb-1">Role</label>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white text-secondary"
+              >
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="approver">Approver</option>
+                <option value="requester">Requester (Employee)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-secondary mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white text-secondary"
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive (Suspended)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-secondary mb-1">Department</label>
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white text-secondary"
+              >
+                <option value="">All Departments</option>
+                {["IT", "HR", "Finance", "Operations", "Marketing", "Sales"].map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Spinner */}
+        {loading ? (
+          <div className="py-12 flex flex-col items-center justify-center">
+            <svg className="animate-spin h-8 w-8 text-primary mb-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-slate-400 font-medium">Fetching users from database...</span>
+          </div>
+        ) : (
+          /* Feature Component */
+          <UserTableWithActions
+            data={users}
+            selectedRows={selectedRows}
+            onSelectRows={setSelectedRows}
+            onView={handleViewUser}
+            onEdit={handleEditUser}
+            onDelete={handleDeleteUser}
+            showCheckboxes={isDeleteMode}
+          />
+        )}
       </div>
 
       {/* Modals */}
