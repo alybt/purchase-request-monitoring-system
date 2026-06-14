@@ -21,6 +21,7 @@ class UserTest extends TestCase
         // Seed users for testing
         $this->admin = User::factory()->create([
             'first_name' => 'Admin',
+            'middle_name' => null,
             'last_name' => 'User',
             'email' => 'admin@example.com',
             'role' => 'admin',
@@ -40,6 +41,7 @@ class UserTest extends TestCase
 
         $this->employee2 = User::factory()->create([
             'first_name' => 'Jane',
+            'middle_name' => null,
             'last_name' => 'Smith',
             'email' => 'jane.smith@example.com',
             'role' => 'approver',
