@@ -27,7 +27,16 @@ export default function LoginForm() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      router.push("/dashboard");
+      const role = data.user?.role;
+      if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (role === "approver") {
+        router.push("/approver/dashboard");
+      } else if (role === "employee") {
+        router.push("/employee/dashboard");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
