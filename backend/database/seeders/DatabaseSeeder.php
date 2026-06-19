@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'first_name' => 'Admin',
             'last_name' => 'User',
-            'email' => 'admin@example.com',
+            'email' => 'admin@prms',
             'password' => Hash::make('password'),
             'role' => 'admin',
             'status' => 'active',
@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
         $approver = User::create([
             'first_name' => 'Approver',
             'last_name' => 'User',
-            'email' => 'approver@example.com',
+            'email' => 'finance_approver@prms',
             'password' => Hash::make('password'),
             'role' => 'approver',
             'status' => 'active',
@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
         $employee1 = User::create([
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'email' => 'employee@example.com',
+            'email' => 'operations_employee@prms',
             'password' => Hash::make('password'),
             'role' => 'employee',
             'status' => 'active',
@@ -50,7 +50,7 @@ class DatabaseSeeder extends Seeder
         $employee2 = User::create([
             'first_name' => 'Jane',
             'last_name' => 'Smith',
-            'email' => 'jane@example.com',
+            'email' => 'hr_employee@prms',
             'password' => Hash::make('password'),
             'role' => 'employee',
             'status' => 'active',
@@ -60,7 +60,7 @@ class DatabaseSeeder extends Seeder
         $employee3 = User::create([
             'first_name' => 'Bob',
             'last_name' => 'Johnson',
-            'email' => 'bob@example.com',
+            'email' => 'sales_employee@prms',
             'password' => Hash::make('password'),
             'role' => 'employee',
             'status' => 'suspended',
@@ -201,5 +201,6 @@ class DatabaseSeeder extends Seeder
             'comments' => 'Approved for meeting room A.',
             'action_date' => now()->subDays(5),
         ]);
+
     }
 }
