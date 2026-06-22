@@ -13,25 +13,25 @@ class DashboardController extends Controller
     public function metrics(Request $request)
     {
         try {
-            // 1. Total Spent (where status in ['Approve', 'Released', 'Received'])
-            $totalSpent = PurchaseRequest::whereIn('status', ['Approve', 'Released', 'Received'])
+            $user = $request->user();
+
+            // Total Spent (Approved/Ordered/Received/Released/Completed)
+            $totalSpent = PurchaseRequest::whereIn('status', ['Approved', 'Ordered', 'Received', 'Released', 'Completed'])
                 ->sum('total_estimated_cost');
 
-            // 2. Percentage change from last month
+            // Monthly comparison
             $currentMonth = now()->month;
             $currentYear = now()->year;
             $lastMonthDate = now()->subMonth();
-            $lastMonth = $lastMonthDate->month;
-            $lastMonthYear = $lastMonthDate->year;
 
-            $currentMonthSpent = PurchaseRequest::whereIn('status', ['Approve', 'Released', 'Received'])
+            $currentMonthSpent = PurchaseRequest::whereIn('status', ['Approved', 'Ordered', 'Received', 'Released', 'Completed'])
                 ->whereMonth('created_at', $currentMonth)
                 ->whereYear('created_at', $currentYear)
                 ->sum('total_estimated_cost');
 
-            $lastMonthSpent = PurchaseRequest::whereIn('status', ['Approve', 'Released', 'Received'])
-                ->whereMonth('created_at', $lastMonth)
-                ->whereYear('created_at', $lastMonthYear)
+            $lastMonthSpent = PurchaseRequest::whereIn('status', ['Approved', 'Ordered', 'Received', 'Released', 'Completed'])
+                ->whereMonth('created_at', $lastMonthDate->month)
+                ->whereYear('created_at', $lastMonthDate->year)
                 ->sum('total_estimated_cost');
 
             $changePercentage = 0.0;
@@ -41,48 +41,45 @@ class DashboardController extends Controller
                 $changePercentage = 100.0;
             }
 
-            // 3. Bottlenecks (status = 'Request' and pending > 48 hours)
-            $bottlenecksCount = PurchaseRequest::where('status', 'Request')
+            // Bottlenecks: Submitted > 48 hours
+            $bottlenecksCount = PurchaseRequest::where('status', 'Submitted')
                 ->where('created_at', '<', now()->subHours(48))
                 ->count();
 
-            // 4. Active Users count
+            // Active Users
             $activeUsersCount = User::where('status', 'active')->count();
 
-            // 5. Monthly expenditure for the last 6 months
+            // Monthly expenditure for last 6 months
             $monthlyData = [];
             for ($i = 5; $i >= 0; $i--) {
                 $date = now()->subMonths($i);
-                $monthName = $date->format('F');
-                $m = $date->month;
-                $y = $date->year;
-
-                $spent = PurchaseRequest::whereIn('status', ['Approve', 'Released', 'Received'])
-                    ->whereMonth('created_at', $m)
-                    ->whereYear('created_at', $y)
+                $spent = PurchaseRequest::whereIn('status', ['Approved', 'Ordered', 'Received', 'Released', 'Completed'])
+                    ->whereMonth('created_at', $date->month)
+                    ->whereYear('created_at', $date->year)
                     ->sum('total_estimated_cost');
 
                 $monthlyData[] = [
-                    'month' => $monthName,
+                    'month' => $date->format('F'),
                     'spent' => floatval($spent),
                 ];
             }
 
-            // 6. Department breakdown
+            // Department breakdown using the new schema
             $departmentBreakdown = DB::table('purchase_requests')
-                ->join('users', 'purchase_requests.user_id', '=', 'users.id')
+                ->join('departments', 'purchase_requests.department_id', '=', 'departments.id')
                 ->select(
-                    'users.department',
+                    'departments.name as department',
                     DB::raw('count(purchase_requests.id) as pr_count'),
                     DB::raw('sum(purchase_requests.total_estimated_cost) as total_spent')
                 )
-                ->groupBy('users.department')
+                ->whereNotNull('purchase_requests.department_id')
+                ->groupBy('departments.id', 'departments.name')
                 ->get()
                 ->map(function ($item) {
                     return [
                         'department' => $item->department,
                         'pr_count' => intval($item->pr_count),
-                        'total_spent' => floatval($item->total_spent ?? 0.00),
+                        'total_spent' => floatval($item->total_spent ?? 0),
                     ];
                 });
 
@@ -100,17 +97,14 @@ class DashboardController extends Controller
             Log::error('Get dashboard metrics failure: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'message' => 'An unexpected error occurred. Please try again later.'
-            ], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again later.'], 500);
         }
     }
 
     public function recentPrs()
     {
         try {
-            $recentPrs = PurchaseRequest::with('user')
+            $recentPrs = PurchaseRequest::with(['requester', 'department', 'category'])
                 ->orderBy('created_at', 'desc')
                 ->limit(5)
                 ->get();
@@ -122,18 +116,15 @@ class DashboardController extends Controller
             Log::error('Get recent PRs failure: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'message' => 'An unexpected error occurred. Please try again later.'
-            ], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again later.'], 500);
         }
     }
 
     public function pendingApprovals()
     {
         try {
-            $pendingApprovals = PurchaseRequest::with('user')
-                ->where('status', 'Request')
+            $pendingApprovals = PurchaseRequest::with(['requester', 'department', 'category'])
+                ->where('status', 'Submitted')
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -144,10 +135,7 @@ class DashboardController extends Controller
             Log::error('Get pending approvals failure: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'message' => 'An unexpected error occurred. Please try again later.'
-            ], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again later.'], 500);
         }
     }
 }

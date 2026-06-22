@@ -22,10 +22,8 @@ export default function RootPage() {
       const role = user?.role;
       if (role === "admin") {
         router.replace("/admin/dashboard");
-      } else if (role === "approver") {
-        router.replace("/approver/dashboard");
-      } else if (role === "employee") {
-        router.replace("/employee/dashboard");
+      } else if (role === "department_head") {
+        router.replace("/department-head/dashboard");
       } else {
         router.replace("/dashboard");
       }

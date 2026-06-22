@@ -23,7 +23,7 @@ export default function LoginPage() {
       if (data.token && data.user) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        const role = data.user.role as "admin" | "approver" | "employee";
+        const role = data.user.role as "admin" | "department_head";
         router.push(roleHomePath(role));
       } else {
         setError(data.message || "Invalid credentials. Please try again.");

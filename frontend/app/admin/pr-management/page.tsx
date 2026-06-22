@@ -100,10 +100,14 @@ export default function AdminPRManagementPage() {
                 value: statusFilter,
                 onChange: setStatusFilter,
                 options: [
-                  { label: "Pending", value: "pending" },
-                  { label: "Approved", value: "approved" },
-                  { label: "Rejected", value: "rejected" },
-                  { label: "Completed", value: "completed" },
+                  { label: "Draft", value: "Draft" },
+                  { label: "Submitted", value: "Submitted" },
+                  { label: "Approved", value: "Approved" },
+                  { label: "Rejected", value: "Rejected" },
+                  { label: "Ordered", value: "Ordered" },
+                  { label: "Received", value: "Received" },
+                  { label: "Released", value: "Released" },
+                  { label: "Completed", value: "Completed" },
                 ],
               },
             ]}
@@ -121,10 +125,14 @@ export default function AdminPRManagementPage() {
                 }}
               >
                 <option value="">Update Status…</option>
-                <option value="pending">Set Pending</option>
-                <option value="approved">Set Approved</option>
-                <option value="rejected">Set Rejected</option>
-                <option value="completed">Set Completed</option>
+                <option value="Draft">Set Draft</option>
+                <option value="Submitted">Set Submitted</option>
+                <option value="Approved">Set Approved</option>
+                <option value="Rejected">Set Rejected</option>
+                <option value="Ordered">Set Ordered</option>
+                <option value="Received">Set Received</option>
+                <option value="Released">Set Released</option>
+                <option value="Completed">Set Completed</option>
               </select>
               <button
                 onClick={() => setShowDelete(true)}

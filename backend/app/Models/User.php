@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,18 +9,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['first_name', 'middle_name', 'last_name', 'email', 'password', 'role', 'status', 'department'])]
+#[Fillable(['first_name', 'middle_name', 'last_name', 'email', 'password', 'role', 'status', 'department_id'])]
 #[Hidden(['password'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -30,13 +22,43 @@ class User extends Authenticatable
         ];
     }
 
-    public function purchaseRequests()
+    public function department()
     {
-        return $this->hasMany(PurchaseRequest::class);
+        return $this->belongsTo(Department::class);
     }
 
-    public function approvals()
+    public function purchaseRequests()
     {
-        return $this->hasMany(ApprovalForm::class, 'approver_id');
+        return $this->hasMany(PurchaseRequest::class, 'requested_by');
+    }
+
+    public function approvedPurchaseRequests()
+    {
+        return $this->hasMany(PurchaseRequest::class, 'approved_by');
+    }
+
+    public function statusHistory()
+    {
+        return $this->hasMany(PurchaseRequestStatusHistory::class, 'changed_by');
+    }
+
+    public function uploadedAttachments()
+    {
+        return $this->hasMany(PurchaseRequestAttachment::class, 'uploaded_by');
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isDepartmentHead(): bool
+    {
+        return $this->role === 'department_head';
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->middle_name} {$this->last_name}");
     }
 }

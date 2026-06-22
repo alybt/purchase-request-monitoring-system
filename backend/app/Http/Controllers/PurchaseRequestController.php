@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PurchaseRequest;
-use App\Models\PrLineItem;
-use App\Models\ApprovalForm;
+use App\Models\PurchaseRequestItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,18 +14,18 @@ class PurchaseRequestController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = PurchaseRequest::with(['user', 'lineItems', 'approvals.approver']);
+            $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory']);
 
             // Filter by status
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
 
-            // Filter by department (of the requester user)
+            // Filter by department
             if ($request->filled('department')) {
                 $department = $request->input('department');
-                $query->whereHas('user', function ($q) use ($department) {
-                    $q->where('department', $department);
+                $query->whereHas('department', function ($q) use ($department) {
+                    $q->where('name', $department)->orWhere('code', $department);
                 });
             }
 
@@ -35,8 +34,8 @@ class PurchaseRequestController extends Controller
                 $search = $request->input('search');
                 $query->where(function ($q) use ($search) {
                     $q->where('pr_number', 'like', "%{$search}%")
-                      ->orWhere('purpose_of_requests', 'like', "%{$search}%")
-                      ->orWhereHas('user', function ($uq) use ($search) {
+                      ->orWhere('purpose', 'like', "%{$search}%")
+                      ->orWhereHas('requester', function ($uq) use ($search) {
                           $uq->where('first_name', 'like', "%{$search}%")
                             ->orWhere('middle_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%")
@@ -65,7 +64,9 @@ class PurchaseRequestController extends Controller
     {
         try {
             $request->validate([
-                'purpose_of_requests' => 'required|string',
+                'purpose' => 'required|string',
+                'department_id' => 'nullable|integer|exists:departments,id',
+                'category_id' => 'nullable|integer|exists:categories,id',
                 'line_items' => 'required|array|min:1',
                 'line_items.*.item_name' => 'required|string|max:255',
                 'line_items.*.description' => 'nullable|string',
@@ -80,9 +81,11 @@ class PurchaseRequestController extends Controller
 
                 $pr = PurchaseRequest::create([
                     'pr_number' => $prNumber,
-                    'user_id' => $user->id,
-                    'purpose_of_requests' => $request->input('purpose_of_requests'),
-                    'status' => 'Request',
+                    'requested_by' => $user->id,
+                    'department_id' => $request->input('department_id', $user->department_id),
+                    'category_id' => $request->input('category_id'),
+                    'purpose' => $request->input('purpose'),
+                    'status' => 'Draft',
                     'total_estimated_cost' => 0.00,
                 ]);
 
@@ -91,7 +94,7 @@ class PurchaseRequestController extends Controller
                     $totalPrice = $item['quantity'] * $item['unit_price'];
                     $totalCost += $totalPrice;
 
-                    $pr->lineItems()->create([
+                    $pr->items()->create([
                         'item_name' => $item['item_name'],
                         'description' => $item['description'] ?? null,
                         'quantity' => $item['quantity'],
@@ -108,7 +111,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'message' => 'Purchase request created successfully.',
-                'purchase_request' => $purchaseRequest->load('lineItems')
+                'purchase_request' => $purchaseRequest->load(['items', 'requester', 'department', 'category'])
             ], 201);
         } catch (ValidationException $e) {
             throw $e;
@@ -126,7 +129,7 @@ class PurchaseRequestController extends Controller
     public function show($id)
     {
         try {
-            $pr = PurchaseRequest::with(['lineItems', 'user', 'approvals.approver'])->find($id);
+            $pr = PurchaseRequest::with(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])->find($id);
 
             if (!$pr) {
                 return response()->json([
@@ -161,9 +164,12 @@ class PurchaseRequestController extends Controller
             }
 
             $request->validate([
-                'purpose_of_requests' => 'required|string',
-                'status' => 'nullable|string|in:Request,Approve,Released,Received',
-                'line_items' => 'required|array|min:1',
+                'purpose' => 'sometimes|required|string',
+                'status' => 'nullable|string|in:Draft,Submitted,Approved,Rejected,Ordered,Received,Released,Completed',
+                'remarks' => 'nullable|string',
+                'department_id' => 'nullable|integer|exists:departments,id',
+                'category_id' => 'nullable|integer|exists:categories,id',
+                'line_items' => 'sometimes|required|array|min:1',
                 'line_items.*.item_name' => 'required|string|max:255',
                 'line_items.*.description' => 'nullable|string',
                 'line_items.*.quantity' => 'required|integer|min:1',
@@ -172,36 +178,40 @@ class PurchaseRequestController extends Controller
             ]);
 
             DB::transaction(function () use ($request, $pr) {
-                $pr->update([
-                    'purpose_of_requests' => $request->input('purpose_of_requests'),
-                    'status' => $request->input('status', $pr->status),
-                ]);
+                $updateData = [];
+                if ($request->has('purpose')) $updateData['purpose'] = $request->input('purpose');
+                if ($request->has('status')) $updateData['status'] = $request->input('status');
+                if ($request->has('remarks')) $updateData['remarks'] = $request->input('remarks');
+                if ($request->has('department_id')) $updateData['department_id'] = $request->input('department_id');
+                if ($request->has('category_id')) $updateData['category_id'] = $request->input('category_id');
 
-                // Delete old line items
-                $pr->lineItems()->delete();
+                $pr->update($updateData);
 
-                // Create new line items
-                $totalCost = 0;
-                foreach ($request->input('line_items') as $item) {
-                    $totalPrice = $item['quantity'] * $item['unit_price'];
-                    $totalCost += $totalPrice;
+                if ($request->has('line_items')) {
+                    $pr->items()->delete();
 
-                    $pr->lineItems()->create([
-                        'item_name' => $item['item_name'],
-                        'description' => $item['description'] ?? null,
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $item['unit_price'],
-                        'total_price' => $totalPrice,
-                        'vendor' => $item['vendor'] ?? null,
-                    ]);
+                    $totalCost = 0;
+                    foreach ($request->input('line_items') as $item) {
+                        $totalPrice = $item['quantity'] * $item['unit_price'];
+                        $totalCost += $totalPrice;
+
+                        $pr->items()->create([
+                            'item_name' => $item['item_name'],
+                            'description' => $item['description'] ?? null,
+                            'quantity' => $item['quantity'],
+                            'unit_price' => $item['unit_price'],
+                            'total_price' => $totalPrice,
+                            'vendor' => $item['vendor'] ?? null,
+                        ]);
+                    }
+
+                    $pr->update(['total_estimated_cost' => $totalCost]);
                 }
-
-                $pr->update(['total_estimated_cost' => $totalCost]);
             });
 
             return response()->json([
                 'message' => 'Purchase request updated successfully.',
-                'purchase_request' => $pr->load('lineItems')
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'department', 'category'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -272,8 +282,6 @@ class PurchaseRequestController extends Controller
             ], 500);
         }
     }
-
-
 
     private function generatePrNumber(): string
     {

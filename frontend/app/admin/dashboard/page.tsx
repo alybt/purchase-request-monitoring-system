@@ -11,9 +11,19 @@ import { getUsers } from "@/services/users.service";
 import type { PRData } from "@/services/purchase-requests.service";
 
 const icons = {
-  total: (
+  budget: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  allocated: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  available: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   ),
   pending: (
@@ -31,35 +41,27 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
-  users: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
 };
 
 export default function AdminDashboardPage() {
   const [prs, setPrs] = useState<PRData[]>([]);
-  const [activeUsers, setActiveUsers] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  // Mock budget data - will be replaced with API calls
+  const companyBudget = 10000000;
+  const allocatedBudget = 10000000;
+  const availableBudget = companyBudget - allocatedBudget;
 
   useEffect(() => {
-    Promise.all([
-      getPurchaseRequests(),
-      getUsers(),
-    ])
-      .then(([prData, userData]) => {
-        setPrs(prData);
-        setActiveUsers(userData.filter(u => u.status === 'active').length);
-      })
+    getPurchaseRequests()
+      .then(setPrs)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  const totalPRs = prs.length;
-  const pendingRequests = prs.filter((pr) => pr.status === "pending").length;
-  const approvedRequests = prs.filter((pr) => pr.status === "approved" || pr.status === "completed").length;
-  const rejectedRequests = prs.filter((pr) => pr.status === "rejected").length;
+  const pendingRequests = prs.filter((pr) => pr.status === "Submitted").length;
+  const approvedRequests = prs.filter((pr) => pr.status === "Approved").length;
+  const rejectedRequests = prs.filter((pr) => pr.status === "Rejected").length;
 
   // Calculate monthly trend
   const monthCounts: Record<string, number> = {};
@@ -76,7 +78,7 @@ export default function AdminDashboardPage() {
   }));
 
   const statusDistribution = [
-    { status: "Pending", count: pendingRequests, color: "#EAB308" },
+    { status: "Submitted", count: pendingRequests, color: "#EAB308" },
     { status: "Approved", count: approvedRequests, color: "#10B981" },
     { status: "Rejected", count: rejectedRequests, color: "#EF4444" },
   ];
@@ -93,19 +95,24 @@ export default function AdminDashboardPage() {
         <div className="p-8 text-center text-secondary/50">Loading dashboard data...</div>
       ) : (
         <>
-          {/* Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-            <StatCard title="Total PRs" value={totalPRs} icon={icons.total} colorScheme="primary" subtitle="All time requests" />
-            <StatCard title="Pending" value={pendingRequests} icon={icons.pending} colorScheme="gold" subtitle="Awaiting action" />
-            <StatCard title="Approved" value={approvedRequests} icon={icons.approved} colorScheme="accent" subtitle="This period" />
-            <StatCard title="Rejected" value={rejectedRequests} icon={icons.rejected} colorScheme="red" subtitle="Declined" />
-            <StatCard title="Active Users" value={activeUsers} icon={icons.users} colorScheme="blue" subtitle="Currently active" />
+          {/* Budget Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard title="Total Company Budget" value={`₱${companyBudget.toLocaleString()}`} icon={icons.budget} colorScheme="primary" subtitle="Fiscal Year 2026" />
+            <StatCard title="Total Allocated Budget" value={`₱${allocatedBudget.toLocaleString()}`} icon={icons.allocated} colorScheme="accent" subtitle="To departments" />
+            <StatCard title="Total Available Budget" value={`₱${availableBudget.toLocaleString()}`} icon={icons.available} colorScheme="gold" subtitle="Unallocated" />
+          </div>
+
+          {/* PR Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard title="Pending Requests" value={pendingRequests} icon={icons.pending} colorScheme="gold" subtitle="Awaiting review" />
+            <StatCard title="Approved Requests" value={approvedRequests} icon={icons.approved} colorScheme="accent" subtitle="Ready for procurement" />
+            <StatCard title="Rejected Requests" value={rejectedRequests} icon={icons.rejected} colorScheme="red" subtitle="Declined" />
           </div>
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <BarChart
-              title="Monthly Purchase Requests"
+              title="Monthly Procurement Trends"
               data={monthlyTrend}
               color="#408E61"
             />
@@ -119,7 +126,7 @@ export default function AdminDashboardPage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-secondary">Recent Purchase Requests</h3>
-              <Link href="/admin/pr-management" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+              <Link href="/admin/purchase-requests" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
                 View All →
               </Link>
             </div>

@@ -16,7 +16,7 @@ export interface UserResponse {
   middle_name?: string | null;
   last_name: string;
   email: string;
-  role: "admin" | "approver" | "employee";
+  role: "admin" | "department_head";
   status: "active" | "suspended" | "dismissed";
   department: string;
   created_at: string;
@@ -30,7 +30,7 @@ export interface UserData {
   name: string;
   email: string;
   department: string;
-  role: "admin" | "approver" | "requester";
+  role: "admin" | "department_head";
   status: "active" | "inactive";
   joinDate: string;
 }
@@ -48,7 +48,7 @@ export function mapBackendUserToFrontend(user: UserResponse): UserData {
     name: fullName,
     email: user.email,
     department: user.department || "",
-    role: user.role === "employee" ? "requester" : user.role,
+    role: user.role,
     status: user.status === "suspended" ? "inactive" : "active",
     joinDate: user.created_at ? user.created_at.split("T")[0] : "",
   };
@@ -62,10 +62,7 @@ export async function getUsers(
 ): Promise<UserData[]> {
   const params = new URLSearchParams();
   if (search) params.append("search", search);
-  if (role) {
-    const backendRole = role === "requester" ? "employee" : role;
-    params.append("role", backendRole);
-  }
+  if (role) params.append("role", role);
   if (status) {
     const backendStatus = status === "inactive" ? "suspended" : status;
     params.append("status", backendStatus);
@@ -95,7 +92,6 @@ export async function createUser(data: {
   role: string;
   status: string;
 }): Promise<UserData> {
-  const backendRole = data.role === "requester" ? "employee" : data.role;
   const backendStatus = data.status === "inactive" ? "suspended" : data.status;
 
   const response = await fetch(`${API_URL}/users`, {
@@ -107,7 +103,7 @@ export async function createUser(data: {
       last_name: data.last_name,
       email: data.email,
       department: data.department,
-      role: backendRole,
+      role: data.role,
       status: backendStatus,
       password: "password123", // Default password for new users
     }),
@@ -134,7 +130,6 @@ export async function updateUser(
     status: string;
   },
 ): Promise<UserData> {
-  const backendRole = data.role === "requester" ? "employee" : data.role;
   const backendStatus = data.status === "inactive" ? "suspended" : data.status;
 
   const response = await fetch(`${API_URL}/users/${id}`, {
@@ -146,7 +141,7 @@ export async function updateUser(
       last_name: data.last_name,
       email: data.email,
       department: data.department,
-      role: backendRole,
+      role: data.role,
       status: backendStatus,
     }),
   });

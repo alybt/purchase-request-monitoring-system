@@ -61,18 +61,3 @@ export async function getRecentPRs(): Promise<RecentPR[]> {
   const data = await response.json();
   return data.recent_purchase_requests || [];
 }
-
-export async function getPendingApprovals(): Promise<RecentPR[]> {
-  const response = await fetch(`${API_URL}/dashboard/pending-approvals`, {
-    method: "GET",
-    headers: getHeaders(),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json();
-    throw new Error(errData.message || "Failed to fetch pending approvals");
-  }
-
-  const data = await response.json();
-  return data.pending_approvals || [];
-}

@@ -23,34 +23,28 @@ export interface PRData {
   id: string;
   prNumber: string;
   department: string;
+  category?: string;
   amount: number;
-  status: "pending" | "approved" | "rejected" | "completed";
+  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed";
   requestedBy: string;
   dateRequested: string;
   dueDate: string;
   description?: string;
-  notes?: string;
+  remarks?: string;
   lineItems?: LineItem[];
-  approvals?: any[];
+  statusHistory?: any[];
 }
 
 export function mapBackendPRToFrontend(pr: any): PRData {
-  let status: "pending" | "approved" | "rejected" | "completed" = "pending";
-  const hasRejection = pr.approvals?.some((app: any) => app.status === "Reject");
+  const status = pr.status || "Draft";
 
-  if (hasRejection) {
-    status = "rejected";
-  } else if (pr.status === "Approve") {
-    status = "approved";
-  } else if (pr.status === "Released" || pr.status === "Received") {
-    status = "completed";
-  } else {
-    status = "pending";
-  }
-
-  const requesterName = pr.user
+  const requesterName = pr.requester
+    ? `${pr.requester.first_name || ""} ${pr.requester.last_name || ""}`.trim()
+    : pr.user
     ? `${pr.user.first_name || ""} ${pr.user.last_name || ""}`.trim()
     : "Unknown";
+
+  const departmentName = pr.department?.name || pr.requester?.department?.name || "General";
 
   const dateRequested = pr.created_at ? pr.created_at.split("T")[0] : "";
   const dueDate = pr.created_at
@@ -60,16 +54,17 @@ export function mapBackendPRToFrontend(pr: any): PRData {
   return {
     id: String(pr.id),
     prNumber: pr.pr_number,
-    department: pr.user?.department || "General",
+    department: departmentName,
+    category: pr.category?.name || "",
     amount: parseFloat(pr.total_estimated_cost) || 0,
     status,
     requestedBy: requesterName,
     dateRequested,
     dueDate,
-    description: pr.purpose_of_requests || "",
-    notes: pr.notes || "",
-    lineItems: pr.line_items || [],
-    approvals: pr.approvals || [],
+    description: pr.purpose || pr.purpose_of_requests || "",
+    remarks: pr.remarks || pr.notes || "",
+    lineItems: pr.items || pr.line_items || pr.purchase_request_items || [],
+    statusHistory: pr.status_history || pr.statusHistory || [],
   };
 }
 
@@ -77,14 +72,7 @@ export async function getPurchaseRequests(search = "", department = "", status =
   const params = new URLSearchParams();
   if (search) params.append("search", search);
   if (department) params.append("department", department);
-  if (status) {
-    // Map frontend status to backend status
-    let backendStatus = "";
-    if (status === "pending") backendStatus = "Request";
-    else if (status === "approved") backendStatus = "Approve";
-    else if (status === "completed") backendStatus = "Received";
-    if (backendStatus) params.append("status", backendStatus);
-  }
+  if (status) params.append("status", status);
 
   const response = await fetch(`${API_URL}/purchase-requests?${params.toString()}`, {
     method: "GET",
@@ -143,16 +131,12 @@ export async function createPurchaseRequest(data: { description: string; amount:
 }
 
 export async function updatePurchaseRequest(id: string, data: { description: string; amount: number; status?: string }): Promise<PRData> {
-  let backendStatus = "Request";
-  if (data.status === "approved") backendStatus = "Approve";
-  else if (data.status === "completed") backendStatus = "Received";
-
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "PUT",
     headers: getHeaders(),
     body: JSON.stringify({
-      purpose_of_requests: data.description,
-      status: backendStatus,
+      purpose: data.description,
+      status: data.status,
       line_items: [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
@@ -198,31 +182,5 @@ export async function bulkDeletePurchaseRequests(ids: string[]): Promise<void> {
   if (!response.ok) {
     const errData = await response.json();
     throw new Error(errData.message || "Failed to delete purchase requests");
-  }
-}
-
-export async function approvePurchaseRequest(id: string, comments = ""): Promise<void> {
-  const response = await fetch(`${API_URL}/purchase-requests/${id}/approve`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ comments }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json();
-    throw new Error(errData.message || "Failed to approve purchase request");
-  }
-}
-
-export async function rejectPurchaseRequest(id: string, comments = ""): Promise<void> {
-  const response = await fetch(`${API_URL}/purchase-requests/${id}/reject`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ comments }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json();
-    throw new Error(errData.message || "Failed to reject purchase request");
   }
 }

@@ -296,8 +296,7 @@ export default function UsersPage() {
               >
                 <option value="">All Roles</option>
                 <option value="admin">Admin</option>
-                <option value="approver">Approver</option>
-                <option value="requester">Requester (Employee)</option>
+                <option value="department_head">Department Head</option>
               </select>
             </div>
             <div>

@@ -9,7 +9,7 @@ export interface UserFormData {
   last_name: string;
   email: string;
   department: string;
-  role: "admin" | "approver" | "requester";
+  role: "admin" | "department_head";
   status: "active" | "inactive";
 }
 
@@ -22,7 +22,7 @@ interface UserFormModalProps {
 }
 
 const departments = ["IT", "HR", "Finance", "Operations", "Marketing", "Sales"];
-const roles = ["admin", "approver", "requester"];
+const roles = ["admin", "department_head"];
 
 export default function UserFormModal({
   isOpen,
@@ -38,7 +38,7 @@ export default function UserFormModal({
       last_name: "",
       email: "",
       department: "IT",
-      role: "requester",
+      role: "department_head",
       status: "active",
     },
   );
@@ -54,7 +54,7 @@ export default function UserFormModal({
         last_name: "",
         email: "",
         department: "IT",
-        role: "requester",
+        role: "department_head",
         status: "active",
       },
     );

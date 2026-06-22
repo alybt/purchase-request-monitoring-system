@@ -84,7 +84,7 @@ export default function AdminUsersPage() {
     last_name: u.last_name,
     email: u.email,
     department: u.department,
-    role: u.role as "admin" | "approver" | "requester",
+    role: u.role as "admin" | "department_head",
     status: u.status,
   });
 
@@ -122,8 +122,7 @@ export default function AdminUsersPage() {
                 onChange: setRoleFilter,
                 options: [
                   { label: "Admin", value: "admin" },
-                  { label: "Approver", value: "approver" },
-                  { label: "Requester", value: "requester" },
+                  { label: "Department Head", value: "department_head" },
                 ],
               },
               {

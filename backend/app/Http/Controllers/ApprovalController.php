@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PurchaseRequest;
-use App\Models\ApprovalForm;
+use App\Models\PurchaseRequestStatusHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,32 +17,40 @@ class ApprovalController extends Controller
             $pr = PurchaseRequest::find($id);
 
             if (!$pr) {
-                return response()->json([
-                    'message' => 'Purchase request not found.'
-                ], 404);
+                return response()->json(['message' => 'Purchase request not found.'], 404);
+            }
+
+            if (!$pr->canBeApproved()) {
+                return response()->json(['message' => 'Purchase request cannot be approved in its current status.'], 422);
             }
 
             $request->validate([
-                'comments' => 'nullable|string',
+                'remarks' => 'nullable|string',
             ]);
 
             $user = $request->user();
+            $fromStatus = $pr->status;
 
-            DB::transaction(function () use ($pr, $user, $request) {
-                $pr->update(['status' => 'Approve']);
+            DB::transaction(function () use ($pr, $user, $request, $fromStatus) {
+                $pr->update([
+                    'status' => 'Approved',
+                    'approved_by' => $user->id,
+                    'approved_at' => now(),
+                    'remarks' => $request->input('remarks'),
+                ]);
 
-                ApprovalForm::create([
-                    'pr_id' => $pr->id,
-                    'approver_id' => $user->id,
-                    'status' => 'Approve',
-                    'comments' => $request->input('comments'),
-                    'action_date' => now(),
+                PurchaseRequestStatusHistory::create([
+                    'purchase_request_id' => $pr->id,
+                    'from_status' => $fromStatus,
+                    'to_status' => 'Approved',
+                    'changed_by' => $user->id,
+                    'remarks' => $request->input('remarks') ?? 'Approved',
                 ]);
             });
 
             return response()->json([
                 'message' => 'Purchase request approved successfully.',
-                'purchase_request' => $pr->load(['lineItems', 'approvals.approver'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -51,10 +59,7 @@ class ApprovalController extends Controller
                 'pr_id' => $id,
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'message' => 'An unexpected error occurred. Please try again later.'
-            ], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again later.'], 500);
         }
     }
 
@@ -64,34 +69,40 @@ class ApprovalController extends Controller
             $pr = PurchaseRequest::find($id);
 
             if (!$pr) {
-                return response()->json([
-                    'message' => 'Purchase request not found.'
-                ], 404);
+                return response()->json(['message' => 'Purchase request not found.'], 404);
+            }
+
+            if (!$pr->canBeRejected()) {
+                return response()->json(['message' => 'Purchase request cannot be rejected in its current status.'], 422);
             }
 
             $request->validate([
-                'comments' => 'nullable|string',
+                'remarks' => 'nullable|string',
+                'rejection_reason' => 'nullable|string',
             ]);
 
             $user = $request->user();
+            $fromStatus = $pr->status;
 
-            DB::transaction(function () use ($pr, $user, $request) {
-                // Status ENUM is ['Request', 'Approve', 'Released', 'Received']
-                // Since there's no 'Rejected' or 'Reject' state in the ENUM on purchase_requests,
-                // we leave the status of the PR unchanged.
-                // But we register the rejection in the approval_form table.
-                ApprovalForm::create([
-                    'pr_id' => $pr->id,
-                    'approver_id' => $user->id,
-                    'status' => 'Reject',
-                    'comments' => $request->input('comments'),
-                    'action_date' => now(),
+            DB::transaction(function () use ($pr, $user, $request, $fromStatus) {
+                $pr->update([
+                    'status' => 'Rejected',
+                    'rejection_reason' => $request->input('rejection_reason') ?? $request->input('remarks'),
+                    'remarks' => $request->input('remarks'),
+                ]);
+
+                PurchaseRequestStatusHistory::create([
+                    'purchase_request_id' => $pr->id,
+                    'from_status' => $fromStatus,
+                    'to_status' => 'Rejected',
+                    'changed_by' => $user->id,
+                    'remarks' => $request->input('rejection_reason') ?? $request->input('remarks') ?? 'Rejected',
                 ]);
             });
 
             return response()->json([
-                'message' => 'Purchase request rejected successfully.',
-                'purchase_request' => $pr->load(['lineItems', 'approvals.approver'])
+                'message' => 'Purchase request rejected.',
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -100,10 +111,7 @@ class ApprovalController extends Controller
                 'pr_id' => $id,
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'message' => 'An unexpected error occurred. Please try again later.'
-            ], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again later.'], 500);
         }
     }
 }

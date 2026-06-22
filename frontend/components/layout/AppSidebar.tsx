@@ -13,19 +13,17 @@ export interface SidebarMenuItem {
 
 interface SidebarProps {
   menuItems: SidebarMenuItem[];
-  role: "admin" | "approver" | "employee";
+  role: "admin" | "department_head";
 }
 
 const roleTitles = {
   admin: "Admin Panel",
-  approver: "Approver",
-  employee: "My Workspace",
+  department_head: "Department Head",
 };
 
 const roleColors = {
   admin: { dot: "bg-purple-400", label: "text-purple-300" },
-  approver: { dot: "bg-blue-400", label: "text-blue-300" },
-  employee: { dot: "bg-emerald-400", label: "text-emerald-300" },
+  department_head: { dot: "bg-emerald-400", label: "text-emerald-300" },
 };
 
 export default function AppSidebar({ menuItems, role }: SidebarProps) {

@@ -6,7 +6,7 @@ import { getUserDisplayName, getStoredUser, StoredUser } from "@/lib/auth-utils"
 
 interface AppTopbarProps {
   pageTitle?: string;
-  role?: "admin" | "approver" | "employee";
+  role?: "admin" | "department_head";
 }
 
 const notifications = [
@@ -121,9 +121,9 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
                   <p className="text-sm font-bold text-secondary truncate">{displayName}</p>
                   <p className="text-xs text-secondary/50 capitalize">{role ?? user?.role}</p>
                 </div>
-                {role === "employee" && (
+                {role === "department_head" && (
                   <button
-                    onClick={() => router.push("/employee/profile")}
+                    onClick={() => router.push("/department-head/profile")}
                     className="w-full text-left px-4 py-2.5 text-sm text-secondary hover:bg-slate-50 transition-colors"
                   >
                     My Profile

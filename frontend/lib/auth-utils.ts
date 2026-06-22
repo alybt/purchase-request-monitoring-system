@@ -1,6 +1,6 @@
 // Auth utility helpers — client-side only (localStorage-based)
 
-export type AppRole = "admin" | "approver" | "employee";
+export type AppRole = "admin" | "department_head";
 
 export interface StoredUser {
   id?: string | number;
@@ -51,10 +51,8 @@ export function roleHomePath(role: AppRole | null): string {
   switch (role) {
     case "admin":
       return "/admin/dashboard";
-    case "approver":
-      return "/approver/dashboard";
-    case "employee":
-      return "/employee/dashboard";
+    case "department_head":
+      return "/department-head/dashboard";
     default:
       return "/login";
   }

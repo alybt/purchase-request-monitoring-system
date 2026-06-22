@@ -30,10 +30,8 @@ export default function LoginForm() {
       const role = data.user?.role;
       if (role === "admin") {
         router.push("/admin/dashboard");
-      } else if (role === "approver") {
-        router.push("/approver/dashboard");
-      } else if (role === "employee") {
-        router.push("/employee/dashboard");
+      } else if (role === "department_head") {
+        router.push("/department-head/dashboard");
       } else {
         router.push("/dashboard");
       }
