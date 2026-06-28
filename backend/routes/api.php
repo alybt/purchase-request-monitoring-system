@@ -24,34 +24,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    // Users
+    // Users (Read accessible to authenticated users, mutations restricted to admin)
     Route::get('/users', [UserController::class, 'index']);
-    Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/{id}', [UserController::class, 'show']);
-    Route::put('/users/{id}', [UserController::class, 'update']);
-    Route::delete('/users/{id}', [UserController::class, 'destroy']);
-    Route::post('/users/bulk-delete', [UserController::class, 'bulkDestroy']);
 
     // Categories
     Route::get('/categories', [CategoryController::class, 'index']);
 
-    // Departments
+    // Departments (Read accessible, mutations restricted to admin)
     Route::get('/departments', [DepartmentController::class, 'index']);
-    Route::post('/departments', [DepartmentController::class, 'store']);
-    Route::put('/departments/{id}', [DepartmentController::class, 'update']);
-    Route::put('/departments/{id}/budget', [DepartmentController::class, 'updateBudget']);
     Route::get('/departments/budget-summary', [DepartmentController::class, 'budgetSummary']);
     Route::get('/departments/{id}/budget-calculations', [DepartmentController::class, 'budgetCalculations']);
 
     // Purchase Requests
-    Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);
     Route::get('/purchase-requests', [PurchaseRequestController::class, 'index']);
     Route::post('/purchase-requests', [PurchaseRequestController::class, 'store']);
     Route::get('/purchase-requests/{id}', [PurchaseRequestController::class, 'show']);
     Route::put('/purchase-requests/{id}', [PurchaseRequestController::class, 'update']);
     Route::delete('/purchase-requests/{id}', [PurchaseRequestController::class, 'destroy']);
-    Route::post('/purchase-requests/{id}/approve', [ApprovalController::class, 'approve']);
-    Route::post('/purchase-requests/{id}/reject', [ApprovalController::class, 'reject']);
 
     // Budget
     Route::get('/budget/my-department', [BudgetController::class, 'myDepartmentBudget']);
@@ -61,4 +51,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/metrics', [DashboardController::class, 'metrics']);
     Route::get('/dashboard/recent-prs', [DashboardController::class, 'recentPrs']);
     Route::get('/dashboard/pending-approvals', [DashboardController::class, 'pendingApprovals']);
+
+    // Admin-only management routes
+    Route::middleware('role:admin')->group(function () {
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::post('/users/bulk-delete', [UserController::class, 'bulkDestroy']);
+
+        Route::post('/departments', [DepartmentController::class, 'store']);
+        Route::put('/departments/{id}', [DepartmentController::class, 'update']);
+        Route::put('/departments/{id}/budget', [DepartmentController::class, 'updateBudget']);
+
+        Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);
+    });
+
+    // Approval routes (Approvers & Admins only)
+    Route::middleware('role:admin,department_head')->group(function () {
+        Route::post('/purchase-requests/{id}/approve', [ApprovalController::class, 'approve']);
+        Route::post('/purchase-requests/{id}/reject', [ApprovalController::class, 'reject']);
+    });
 });

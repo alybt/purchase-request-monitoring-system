@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
     'requested_by',
     'approved_by',
     'purpose',
+    'purpose_of_requests',
+    'user_id',
     'total_estimated_cost',
     'status',
     'remarks',
@@ -63,6 +65,36 @@ class PurchaseRequest extends Model
         return $this->hasMany(PurchaseRequestItem::class);
     }
 
+    public function lineItems()
+    {
+        return $this->items();
+    }
+
+    public function user()
+    {
+        return $this->requester();
+    }
+
+    public function setUserIdAttribute($value)
+    {
+        $this->attributes['requested_by'] = $value;
+    }
+
+    public function getUserIdAttribute()
+    {
+        return $this->requested_by;
+    }
+
+    public function setPurposeOfRequestsAttribute($value)
+    {
+        $this->attributes['purpose'] = $value;
+    }
+
+    public function getPurposeOfRequestsAttribute()
+    {
+        return $this->purpose;
+    }
+
     public function attachments()
     {
         return $this->hasMany(PurchaseRequestAttachment::class);
@@ -75,17 +107,17 @@ class PurchaseRequest extends Model
 
     public function canBeSubmitted(): bool
     {
-        return $this->status === 'Draft';
+        return in_array($this->status, ['Draft', 'Request']);
     }
 
     public function canBeApproved(): bool
     {
-        return $this->status === 'Submitted';
+        return in_array($this->status, ['Submitted', 'Request', 'Draft']);
     }
 
     public function canBeRejected(): bool
     {
-        return $this->status === 'Submitted';
+        return in_array($this->status, ['Submitted', 'Request', 'Draft']);
     }
 
     public function canBeOrdered(): bool

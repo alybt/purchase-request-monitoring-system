@@ -37,13 +37,26 @@ class UserController extends Controller
 
             // Department filter
             if ($request->filled('department')) {
-                $query->where('department', $request->input('department'));
+                $dept = $request->input('department');
+                if (is_numeric($dept)) {
+                    $query->where('department_id', $dept);
+                } else {
+                    $query->whereHas('department', function ($q) use ($dept) {
+                        $q->where('name', $dept)->orWhere('code', $dept);
+                    });
+                }
             }
 
-            $users = $query->orderBy('id', 'desc')->get();
+            $users = $query->with('department')->orderBy('id', 'desc')->paginate($request->integer('per_page', 15));
 
             return response()->json([
-                'users' => $users
+                'users' => $users->items(),
+                'pagination' => [
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total(),
+                ]
             ], 200);
         } catch (\Throwable $e) {
             Log::error('List users failure: ' . $e->getMessage(), [
@@ -65,13 +78,27 @@ class UserController extends Controller
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8',
-                'role' => 'nullable|string|in:admin,approver,employee',
+                'role' => 'nullable|string|in:admin,department_head,approver,employee',
                 'status' => 'nullable|string|in:active,dismissed,suspended',
                 'department' => 'nullable|string|max:100',
+                'department_id' => 'nullable|integer|exists:departments,id',
             ]);
 
+            if (isset($fields['department']) && !isset($fields['department_id'])) {
+                $dept = \App\Models\Department::where('name', $fields['department'])->orWhere('code', $fields['department'])->first();
+                if ($dept) {
+                    $fields['department_id'] = $dept->id;
+                }
+            }
+            unset($fields['department']);
+
             $fields['password'] = bcrypt($fields['password']);
-            $fields['role'] = $fields['role'] ?? 'employee';
+            // Map legacy roles to department_head
+            if (in_array($fields['role'] ?? '', ['approver', 'employee'])) {
+                $fields['role'] = 'department_head';
+            } else {
+                $fields['role'] = $fields['role'] ?? 'department_head';
+            }
             $fields['status'] = $fields['status'] ?? 'active';
 
             $user = User::create($fields);
@@ -136,10 +163,23 @@ class UserController extends Controller
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
                 'password' => 'nullable|string|min:8',
-                'role' => 'nullable|string|in:admin,approver,employee',
+                'role' => 'nullable|string|in:admin,department_head,approver,employee',
                 'status' => 'nullable|string|in:active,dismissed,suspended',
                 'department' => 'nullable|string|max:100',
+                'department_id' => 'nullable|integer|exists:departments,id',
             ]);
+
+            if (isset($fields['department']) && !isset($fields['department_id'])) {
+                $dept = \App\Models\Department::where('name', $fields['department'])->orWhere('code', $fields['department'])->first();
+                if ($dept) {
+                    $fields['department_id'] = $dept->id;
+                }
+            }
+            unset($fields['department']);
+
+            if (isset($fields['role']) && in_array($fields['role'], ['approver', 'employee'])) {
+                $fields['role'] = 'department_head';
+            }
 
             if (isset($fields['password']) && !empty($fields['password'])) {
                 $fields['password'] = bcrypt($fields['password']);

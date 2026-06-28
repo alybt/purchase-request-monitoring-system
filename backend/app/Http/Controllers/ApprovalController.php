@@ -20,6 +20,10 @@ class ApprovalController extends Controller
                 return response()->json(['message' => 'Purchase request not found.'], 404);
             }
 
+            if ($pr->requested_by === $request->user()->id) {
+                return response()->json(['message' => 'You cannot approve or reject your own purchase request.'], 403);
+            }
+
             if (!$pr->canBeApproved()) {
                 return response()->json(['message' => 'Purchase request cannot be approved in its current status.'], 422);
             }
@@ -46,6 +50,17 @@ class ApprovalController extends Controller
                     'changed_by' => $user->id,
                     'remarks' => $request->input('remarks') ?? 'Approved',
                 ]);
+
+                if ($pr->department_id) {
+                    $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
+                        ->where('fiscal_year', date('Y', strtotime($pr->created_at ?? now())))
+                        ->where('month', date('n', strtotime($pr->created_at ?? now())))
+                        ->lockForUpdate()
+                        ->first();
+                    if ($budget) {
+                        $budget->increment('reserved_amount', $pr->total_estimated_cost);
+                    }
+                }
             });
 
             return response()->json([
@@ -70,6 +85,10 @@ class ApprovalController extends Controller
 
             if (!$pr) {
                 return response()->json(['message' => 'Purchase request not found.'], 404);
+            }
+
+            if ($pr->requested_by === $request->user()->id) {
+                return response()->json(['message' => 'You cannot approve or reject your own purchase request.'], 403);
             }
 
             if (!$pr->canBeRejected()) {
@@ -98,6 +117,19 @@ class ApprovalController extends Controller
                     'changed_by' => $user->id,
                     'remarks' => $request->input('rejection_reason') ?? $request->input('remarks') ?? 'Rejected',
                 ]);
+
+                if (in_array($fromStatus, ['Approved', 'Approve', 'Ordered'])) {
+                    if ($pr->department_id) {
+                        $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
+                            ->where('fiscal_year', date('Y', strtotime($pr->created_at ?? now())))
+                            ->where('month', date('n', strtotime($pr->created_at ?? now())))
+                            ->lockForUpdate()
+                            ->first();
+                        if ($budget) {
+                            $budget->decrement('reserved_amount', $pr->total_estimated_cost);
+                        }
+                    }
+                }
             });
 
             return response()->json([

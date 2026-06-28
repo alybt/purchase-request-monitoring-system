@@ -44,10 +44,16 @@ class PurchaseRequestController extends Controller
                 });
             }
 
-            $purchaseRequests = $query->orderBy('id', 'desc')->get();
+            $purchaseRequests = $query->orderBy('id', 'desc')->paginate($request->integer('per_page', 15));
 
             return response()->json([
-                'purchase_requests' => $purchaseRequests
+                'purchase_requests' => $purchaseRequests->items(),
+                'pagination' => [
+                    'current_page' => $purchaseRequests->currentPage(),
+                    'last_page' => $purchaseRequests->lastPage(),
+                    'per_page' => $purchaseRequests->perPage(),
+                    'total' => $purchaseRequests->total(),
+                ]
             ], 200);
         } catch (\Throwable $e) {
             Log::error('List purchase requests failure: ' . $e->getMessage(), [
@@ -63,6 +69,10 @@ class PurchaseRequestController extends Controller
     public function store(Request $request)
     {
         try {
+            if (!$request->has('purpose') && $request->has('purpose_of_requests')) {
+                $request->merge(['purpose' => $request->input('purpose_of_requests')]);
+            }
+
             $request->validate([
                 'purpose' => 'required|string',
                 'department_id' => 'nullable|integer|exists:departments,id',
@@ -163,9 +173,13 @@ class PurchaseRequestController extends Controller
                 ], 404);
             }
 
+            if (!$request->has('purpose') && $request->has('purpose_of_requests')) {
+                $request->merge(['purpose' => $request->input('purpose_of_requests')]);
+            }
+
             $request->validate([
                 'purpose' => 'sometimes|required|string',
-                'status' => 'nullable|string|in:Draft,Submitted,Approved,Rejected,Ordered,Received,Released,Completed',
+                'status' => 'nullable|string',
                 'remarks' => 'nullable|string',
                 'department_id' => 'nullable|integer|exists:departments,id',
                 'category_id' => 'nullable|integer|exists:categories,id',
@@ -177,10 +191,16 @@ class PurchaseRequestController extends Controller
                 'line_items.*.vendor' => 'nullable|string|max:255',
             ]);
 
-            DB::transaction(function () use ($request, $pr) {
+            $oldStatus = $pr->status;
+            DB::transaction(function () use ($request, $pr, $oldStatus) {
                 $updateData = [];
                 if ($request->has('purpose')) $updateData['purpose'] = $request->input('purpose');
-                if ($request->has('status')) $updateData['status'] = $request->input('status');
+                if ($request->has('status')) {
+                    $st = $request->input('status');
+                    if ($st === 'Approve') $st = 'Approved';
+                    if ($st === 'Request') $st = 'Submitted';
+                    $updateData['status'] = $st;
+                }
                 if ($request->has('remarks')) $updateData['remarks'] = $request->input('remarks');
                 if ($request->has('department_id')) $updateData['department_id'] = $request->input('department_id');
                 if ($request->has('category_id')) $updateData['category_id'] = $request->input('category_id');
@@ -206,6 +226,21 @@ class PurchaseRequestController extends Controller
                     }
 
                     $pr->update(['total_estimated_cost' => $totalCost]);
+                }
+
+                $newStatus = $pr->status;
+                if (in_array($newStatus, ['Released', 'Received', 'Completed']) && !in_array($oldStatus, ['Released', 'Received', 'Completed'])) {
+                    if ($pr->department_id) {
+                        $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
+                            ->where('fiscal_year', date('Y', strtotime($pr->created_at ?? now())))
+                            ->where('month', date('n', strtotime($pr->created_at ?? now())))
+                            ->lockForUpdate()
+                            ->first();
+                        if ($budget) {
+                            $budget->decrement('reserved_amount', $pr->total_estimated_cost);
+                            $budget->increment('spent_amount', $pr->total_estimated_cost);
+                        }
+                    }
                 }
             });
 
@@ -289,6 +324,7 @@ class PurchaseRequestController extends Controller
         $prefix = "PR-{$year}-";
 
         $lastPr = PurchaseRequest::where('pr_number', 'like', "{$prefix}%")
+            ->lockForUpdate()
             ->orderBy('pr_number', 'desc')
             ->first();
 

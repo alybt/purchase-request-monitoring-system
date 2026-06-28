@@ -30,44 +30,46 @@ This document provides a complete guide to the backend architecture, features, A
   * `password` (string)
   * `first_name` (string)
   * `last_name` (string)
-  * `role` (enum: `'admin'`, `'approver'`, `'requester'`)
-  * `status` (enum: `'active'`, `'suspended'`)
-  * `department` (string)
+  * `role` (enum: `'admin'`, `'department_head'` - backward compatible with legacy `'approver'`, `'employee'`)
+  * `status` (enum: `'active'`, `'dismissed'`, `'suspended'`)
+  * `department_id` (foreign key pointing to `departments.id` - backward compatible with legacy `department` string filter)
   * `timestamps`
 
 ### B. Purchase Requests Table (`purchase_requests`)
 * **Eloquent Model**: `App\Models\PurchaseRequest`
 * **Fields**:
   * `id` (bigint, PK)
-  * `pr_number` (string, unique, e.g., `PR-2026-0001`)
-  * `user_id` (foreign key pointing to `users.id`)
-  * `purpose_of_requests` (text)
-  * `total_estimated_cost` (decimal, `12, 2`, default `0.00`)
-  * `status` (enum: `'Request'`, `'Approve'`, `'Released'`, `'Received'`)
+  * `pr_number` (string, unique, e.g., `PR-2026-001`)
+  * `requested_by` (foreign key pointing to `users.id` - aliased to legacy `user_id`)
+  * `purpose` (text - aliased to legacy `purpose_of_requests`)
+  * `total_estimated_cost` (decimal, `15, 2`, default `0.00`)
+  * `status` (enum: `'Draft'`, `'Submitted'`, `'Approved'`, `'Rejected'`, `'Ordered'`, `'Received'`, `'Released'`, `'Completed'`)
+  * `department_id` (foreign key pointing to `departments.id`)
+  * `category_id` (foreign key pointing to `categories.id`)
   * `timestamps`
 
-### C. Line Items Table (`line_items`)
-* **Eloquent Model**: `App\Models\LineItem`
+### C. Purchase Request Items Table (`purchase_request_items` / legacy `pr_line_items`)
+* **Eloquent Model**: `App\Models\PurchaseRequestItem`
 * **Fields**:
   * `id` (bigint, PK)
-  * `pr_id` (foreign key pointing to `purchase_requests.id`)
+  * `purchase_request_id` (foreign key pointing to `purchase_requests.id` - legacy `pr_id`)
   * `item_name` (string)
   * `description` (text, nullable)
   * `quantity` (integer)
-  * `unit_price` (decimal, `12, 2`)
-  * `total_price` (decimal, `12, 2` - calculated automatically as `quantity * unit_price`)
+  * `unit_price` (decimal, `15, 2`)
+  * `total_price` (decimal, `15, 2` - calculated automatically as `quantity * unit_price`)
   * `vendor` (string, nullable)
   * `timestamps`
 
-### D. Approval Form / Audit Logs Table (`approval_form`)
-* **Eloquent Model**: `App\Models\ApprovalForm`
+### D. Status History / Audit Logs Table (`purchase_request_status_history` / legacy `approval_form`)
+* **Eloquent Model**: `App\Models\PurchaseRequestStatusHistory`
 * **Fields**:
   * `id` (bigint, PK)
-  * `pr_id` (foreign key pointing to `purchase_requests.id`)
-  * `approver_id` (foreign key pointing to `users.id`)
-  * `status` (enum: `'Approve'`, `'Reject'`)
-  * `comments` (text, nullable)
-  * `action_date` (timestamp)
+  * `purchase_request_id` (foreign key pointing to `purchase_requests.id`)
+  * `from_status` (string)
+  * `to_status` (string)
+  * `changed_by` (foreign key pointing to `users.id`)
+  * `remarks` (text, nullable)
   * `timestamps`
 
 ### E. Department Budgets Table (`department_budgets`)
@@ -136,19 +138,19 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
 * `POST /api/purchase-requests/bulk-delete`: Delete multiple PRs. Required JSON body: `{"ids": [1, 2]}`.
 
 ### Approvals Workflow (`ApprovalController`)
-* `POST /api/purchase-requests/{id}/approve`: Approve a PR. Updates the PR status to `'Approve'` and logs an approval record. Optional body: `{"comments": "Approved budget"}`.
-* `POST /api/purchase-requests/{id}/reject`: Reject a PR. Leaves the PR status unchanged (remains `'Request'`) but inserts a `Reject` entry into `approval_form` table to create a permanent history of the rejection. Optional body: `{"comments": "Incorrect pricing"}`.
+* `POST /api/purchase-requests/{id}/approve`: Approve a PR. Updates the PR status to `'Approved'` (backward compatible with `'Approve'`) and inserts an audit log into `purchase_request_status_history`. Also atomically increments the department's `reserved_amount`. Optional body: `{"remarks": "Approved budget"}`.
+* `POST /api/purchase-requests/{id}/reject`: Reject a PR. Updates status to `'Rejected'` and inserts a log into `purchase_request_status_history`. Decrements `reserved_amount` if previously reserved. Optional body: `{"rejection_reason": "Incorrect pricing", "remarks": "Too expensive"}`.
 
 ### Dashboard Analytics (`DashboardController`)
 * `GET /api/dashboard/metrics`: Compiles summary statistics:
-  * `total_spent`: Cost sum of PRs in `'Approve'`, `'Released'`, or `'Received'` status.
+  * `total_spent`: Cost sum of PRs in `'Approved'`, `'Released'`, `'Received'`, or `'Completed'` status.
   * `total_spent_change_percentage`: Percentage spent change compared to last month.
-  * `bottlenecks`: Number of requests with status `'Request'` pending over 48 hours.
+  * `bottlenecks`: Number of requests with status `'Submitted'` or `'Draft'` pending over 48 hours.
   * `active_users`: Active users count.
   * `monthly_data`: Sum of spending per month for the last 6 months.
   * `department_breakdown`: Item count and total cost per department.
 * `GET /api/dashboard/recent-prs`: List of the 5 most recently created PRs.
-* `GET /api/dashboard/pending-approvals`: List of all PRs still in `'Request'` status awaiting approval.
+* `GET /api/dashboard/pending-approvals`: List of all PRs still in `'Submitted'` or `'Draft'` status awaiting approval.
 
 ---
 
@@ -158,23 +160,29 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
 backend/
 ├── app/
 │   ├── Http/
+│   │   ├── Middleware/
+│   │   │   └── CheckRole.php               # RBAC role verification middleware
 │   │   └── Controllers/
 │   │       ├── AuthController.php          # Session log in/out, rate limits
-│   │       ├── UserController.php          # Users CRUD and search filters
-│   │       ├── PurchaseRequestController.php # PR sequential number, transactions
-│   │       ├── ApprovalController.php      # State transitions & audit logging
+│   │       ├── UserController.php          # Users CRUD, pagination, and search filters
+│   │       ├── PurchaseRequestController.php # PR sequential number with lockForUpdate, transactions
+│   │       ├── ApprovalController.php      # State transitions, separation of duties & atomic budget sync
 │   │       └── DashboardController.php     # Summary analytics & monthly aggregation
 │   └── Models/
 │       ├── User.php
-│       ├── PurchaseRequest.php             # HasMany LineItems, HasMany Approvals
-│       ├── LineItem.php                    # BelongsTo PurchaseRequest
-│       └── ApprovalForm.php                # BelongsTo PurchaseRequest/Approver
+│       ├── PurchaseRequest.php             # HasMany PurchaseRequestItems, HasMany StatusHistory
+│       ├── PurchaseRequestItem.php         # BelongsTo PurchaseRequest (legacy LineItem)
+│       └── PurchaseRequestStatusHistory.php # BelongsTo PurchaseRequest/User (legacy ApprovalForm)
 ├── database/
 │   ├── migrations/
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 2026_06_09_000002_create_purchase_requests_table.php
 │   │   ├── 2026_06_09_000003_create_line_items_table.php
-│   │   └── 2026_06_09_000004_create_approval_form_table.php
+│   │   ├── 2026_06_09_000004_create_approval_form_table.php
+│   │   ├── 2026_06_22_000011_refactor_users_table.php
+│   │   ├── 2026_06_22_000011_rename_pr_line_items_table.php
+│   │   ├── 2026_06_22_000012_drop_approval_form_table.php
+│   │   └── 2026_06_22_000012_refactor_purchase_requests_table.php
 │   └── seeders/
 │       └── DatabaseSeeder.php              # Seeds default users and mock data
 ├── routes/
