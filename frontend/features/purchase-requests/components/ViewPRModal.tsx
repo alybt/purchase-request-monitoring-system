@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { printPurchaseRequest } from "@/lib/print";
 
 interface PRData {
   id: string;
@@ -254,11 +255,20 @@ export default function ViewPRModal({
             </div>
           )}
 
-          {/* Close Button */}
-          <div className="pt-4 border-t border-slate-200">
+          {/* Close & Print Buttons */}
+          <div className="pt-4 border-t border-slate-200 flex gap-3">
+            <button
+              onClick={() => printPurchaseRequest(pr)}
+              className="flex-1 bg-slate-100 text-secondary border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-4H7v4a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+              Print / Sign Voucher
+            </button>
             <button
               onClick={onClose}
-              className="w-full bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
+              className="flex-1 bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
             >
               Close
             </button>

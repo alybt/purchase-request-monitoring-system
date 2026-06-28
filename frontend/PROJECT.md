@@ -50,7 +50,8 @@ frontend/
 │           ├── UserTableWithActions.tsx    # Table displaying active user lists
 │           └── ViewUserModal.tsx           # Detail card for user profiles
 ├── lib/
-│   └── api.ts                              # Auth configurations and base login utils
+│   ├── api.ts                              # Auth configurations and base login utils
+│   └── print.ts                            # Print engine and layouts for budgets and PR vouchers
 └── services/
     ├── auth.service.ts                     # Login, Logout session revocation, /api/me profile sync
     ├── users.service.ts                    # User CRUD methods & search/filter query builders
@@ -118,6 +119,12 @@ Backend statuses (`Request`, `Approve`, `Released`, `Received`) are mapped to us
   * `Request` -> `pending`
   * `Approve` -> `approved`
   * `Released` / `Received` -> `completed`
+
+### Print Engine & Sign-Off Generation
+Located in [lib/print.ts](file:///c:/Users/pagar/ali-company-projects/PLProject/purchase-request-monitoring-system/frontend/lib/print.ts):
+* **Format**: Programmatically compiles HTML templates with clean, A4-friendly inline CSS styling.
+* **Voucher Signatures**: Appends physical sign-off lines at the bottom for "Requested By" and "Approved By".
+* **Execution**: Dynamically spawns a temporary hidden `iframe`, injects the styled markup, focuses the iframe, and triggers the system print prompt (`window.print()`), destroying the iframe upon completion to prevent page pollution.
 
 ---
 
