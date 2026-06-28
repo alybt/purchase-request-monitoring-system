@@ -23,14 +23,18 @@ class DepartmentBudgetSeeder extends Seeder
 
         foreach ($allocations as $code => $amount) {
             $department = Department::where('code', $code)->first();
+            $monthlyAmount = $amount / 12;
             
-            DepartmentBudget::create([
-                'department_id' => $department->id,
-                'fiscal_year' => 2026,
-                'allocated_amount' => $amount,
-                'reserved_amount' => 0.00,
-                'spent_amount' => 0.00,
-            ]);
+            for ($month = 1; $month <= 12; $month++) {
+                DepartmentBudget::create([
+                    'department_id' => $department->id,
+                    'fiscal_year' => 2026,
+                    'month' => $month,
+                    'allocated_amount' => $monthlyAmount,
+                    'reserved_amount' => 0.00,
+                    'spent_amount' => 0.00,
+                ]);
+            }
 
             // Update department allocation percentage
             $percentage = ($amount / $companyBudget->total_budget) * 100;

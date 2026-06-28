@@ -70,6 +70,20 @@ This document provides a complete guide to the backend architecture, features, A
   * `action_date` (timestamp)
   * `timestamps`
 
+### E. Department Budgets Table (`department_budgets`)
+* **Eloquent Model**: `App\Models\DepartmentBudget`
+* **Fields**:
+  * `id` (bigint, PK)
+  * `department_id` (foreign key pointing to `departments.id`)
+  * `fiscal_year` (integer, e.g., `2026`)
+  * `month` (integer, `1` to `12`)
+  * `allocated_amount` (decimal, `15, 2`)
+  * `reserved_amount` (decimal, `15, 2`)
+  * `spent_amount` (decimal, `15, 2`)
+  * `available_amount` (computed column: `allocated_amount - reserved_amount - spent_amount`)
+  * `timestamps`
+* **Unique Constraint**: Unique index on `['department_id', 'fiscal_year', 'month']`.
+
 ---
 
 ## 4. API Endpoints
@@ -87,6 +101,17 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
 * `PUT /api/users/{id}`: Update user profile.
 * `DELETE /api/users/{id}`: Delete a user.
 * `POST /api/users/bulk-delete`: Delete multiple users. Required JSON body: `{"ids": [1, 2, 3]}`.
+
+### Department & Budget Management (`DepartmentController`)
+* `GET /api/departments`: List departments with active budgets aggregated for the current fiscal year.
+* `POST /api/departments`: Create a department.
+* `PUT /api/departments/{id}`: Update department name/code.
+* `PUT /api/departments/{id}/budget`: Create or update a budget allocation for a specific month and fiscal year. Accepts: `allocated_amount` (required), `fiscal_year` (optional, default current year), `month` (optional, default current month).
+* `GET /api/departments/budget-summary`: Summarizes allocated, reserved, spent, and available budgets for all departments grouped for the current fiscal year.
+* `GET /api/departments/{id}/budget-calculations`: Fetch detailed budget calculations for a specific department:
+  * **Last 12 Months**: Rolling 12-month summary of budget parameters.
+  * **For the Year**: Sum of allocations/spending for the chosen fiscal year.
+  * **By Quarter**: Dynamic quarterly calculations for Q1 (months 1-3/1-4), Q2 (months 4-6), Q3 (months 7-9), and Q4 (months 10-12).
 
 ### Purchase Request Management (`PurchaseRequestController`)
 * `GET /api/purchase-requests`: List purchase requests. Supports query parameters for `search` (PR number), `status`, and `department`.

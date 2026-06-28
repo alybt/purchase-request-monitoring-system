@@ -30,9 +30,9 @@ class UserFactory extends Factory
             'last_name' => fake()->lastName(),
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'employee',
+            'role' => 'department_head',
             'status' => 'active',
-            'department' => fake()->randomElement(['IT', 'HR', 'Finance', 'Operations', 'Sales']),
+            'department_id' => null,
         ];
     }
 

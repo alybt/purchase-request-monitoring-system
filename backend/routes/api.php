@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/departments/{id}', [DepartmentController::class, 'update']);
     Route::put('/departments/{id}/budget', [DepartmentController::class, 'updateBudget']);
     Route::get('/departments/budget-summary', [DepartmentController::class, 'budgetSummary']);
+    Route::get('/departments/{id}/budget-calculations', [DepartmentController::class, 'budgetCalculations']);
 
     // Purchase Requests
     Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);

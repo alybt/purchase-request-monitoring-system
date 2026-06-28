@@ -13,12 +13,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('department_id')->constrained('departments')->onDelete('cascade');
             $table->integer('fiscal_year')->nullable();
+            $table->integer('month')->default(1);
             $table->decimal('allocated_amount', 15, 2)->default(0.00);
             $table->decimal('reserved_amount', 15, 2)->default(0.00);
             $table->decimal('spent_amount', 15, 2)->default(0.00);
             $table->timestampsTz();
             
-            $table->unique(['department_id', 'fiscal_year']);
+            $table->unique(['department_id', 'fiscal_year', 'month']);
         });
 
         if (DB::getDriverName() === 'pgsql') {

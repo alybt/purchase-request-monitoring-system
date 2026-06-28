@@ -22,10 +22,9 @@ class DepartmentController extends Controller
             ])->orderBy('name')->get();
 
             $mapped = $departments->map(function ($dept) use ($currentYear) {
-                $budget    = $dept->departmentBudgets->first();
-                $allocated = $budget ? floatval($budget->allocated_amount) : 0;
-                $reserved  = $budget ? floatval($budget->reserved_amount)  : 0;
-                $spent     = $budget ? floatval($budget->spent_amount)     : 0;
+                $allocated = floatval($dept->departmentBudgets->sum('allocated_amount'));
+                $reserved  = floatval($dept->departmentBudgets->sum('reserved_amount'));
+                $spent     = floatval($dept->departmentBudgets->sum('spent_amount'));
                 $available = $allocated - $reserved - $spent;
 
                 return [
@@ -120,14 +119,17 @@ class DepartmentController extends Controller
             $request->validate([
                 'allocated_amount' => 'required|numeric|min:0',
                 'fiscal_year'      => 'nullable|integer|min:2000|max:2100',
+                'month'            => 'nullable|integer|min:1|max:12',
             ]);
 
             $fiscalYear      = $request->input('fiscal_year', now()->year);
+            $month           = $request->input('month', now()->month);
             $allocatedAmount = $request->input('allocated_amount');
 
             $budget = DepartmentBudget::firstOrNew([
                 'department_id' => $dept->id,
                 'fiscal_year'   => $fiscalYear,
+                'month'         => $month,
             ]);
 
             // Guard: cannot set below already reserved + spent
@@ -156,6 +158,7 @@ class DepartmentController extends Controller
                     'department'    => $dept->name,
                     'code'          => $dept->code,
                     'fiscal_year'   => (int) $fiscalYear,
+                    'month'         => (int) $month,
                     'allocated'     => floatval($budget->allocated_amount),
                     'reserved'      => floatval($budget->reserved_amount),
                     'spent'         => floatval($budget->spent_amount),
@@ -176,36 +179,43 @@ class DepartmentController extends Controller
     /**
      * Get all departments with their budget summary for the admin budget page.
      */
-    public function budgetSummary()
+    public function budgetSummary(Request $request)
     {
         try {
-            $currentYear = now()->year;
+            $currentYear = $request->input('fiscal_year', now()->year);
 
             $budgets = DepartmentBudget::with('department')
                 ->where('fiscal_year', $currentYear)
                 ->get();
+
+            // Group by department
+            $grouped = $budgets->groupBy('department_id');
 
             $totalAllocated = $budgets->sum(fn($b) => floatval($b->allocated_amount));
             $totalReserved  = $budgets->sum(fn($b) => floatval($b->reserved_amount));
             $totalSpent     = $budgets->sum(fn($b) => floatval($b->spent_amount));
             $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
 
-            $departmentSummaries = $budgets->map(function ($b) use ($totalAllocated) {
-                $allocated = floatval($b->allocated_amount);
+            $departmentSummaries = $grouped->map(function ($deptBudgets, $deptId) use ($totalAllocated) {
+                $first = $deptBudgets->first();
+                $allocated = $deptBudgets->sum(fn($b) => floatval($b->allocated_amount));
+                $reserved  = $deptBudgets->sum(fn($b) => floatval($b->reserved_amount));
+                $spent     = $deptBudgets->sum(fn($b) => floatval($b->spent_amount));
+                
                 return [
-                    'department_id' => $b->department_id,
-                    'department'    => $b->department?->name ?? 'Unknown',
-                    'code'          => $b->department?->code ?? '',
+                    'department_id' => $deptId,
+                    'department'    => $first->department?->name ?? 'Unknown',
+                    'code'          => $first->department?->code ?? '',
                     'allocated'     => $allocated,
-                    'reserved'      => floatval($b->reserved_amount),
-                    'spent'         => floatval($b->spent_amount),
-                    'available'     => $allocated - floatval($b->reserved_amount) - floatval($b->spent_amount),
+                    'reserved'      => $reserved,
+                    'spent'         => $spent,
+                    'available'     => $allocated - $reserved - $spent,
                     'percentage'    => $totalAllocated > 0 ? round(($allocated / $totalAllocated) * 100, 1) : 0,
                 ];
-            });
+            })->values();
 
             return response()->json([
-                'fiscal_year'          => $currentYear,
+                'fiscal_year'          => (int) $currentYear,
                 'total_allocated'      => $totalAllocated,
                 'total_reserved'       => $totalReserved,
                 'total_spent'          => $totalSpent,
@@ -214,6 +224,100 @@ class DepartmentController extends Controller
             ], 200);
         } catch (\Throwable $e) {
             Log::error('Budget summary failure: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
+
+    /**
+     * Get detailed calculations for a department budget (last 12 months, for the year, and by quarters).
+     */
+    public function budgetCalculations(Request $request, $departmentId)
+    {
+        try {
+            $dept = Department::find($departmentId);
+            if (!$dept) {
+                return response()->json(['message' => 'Department not found.'], 404);
+            }
+
+            $year = $request->input('fiscal_year', now()->year);
+            $currentMonth = now()->month;
+
+            // 1. Last 12 months (rolling) calculations
+            $endPeriod = $year * 12 + $currentMonth;
+            $startPeriod = $endPeriod - 11;
+
+            $last12MonthsQuery = DepartmentBudget::where('department_id', $departmentId)
+                ->whereRaw('(fiscal_year * 12 + month) >= ?', [$startPeriod])
+                ->whereRaw('(fiscal_year * 12 + month) <= ?', [$endPeriod]);
+
+            $allocatedL12 = floatval($last12MonthsQuery->sum('allocated_amount'));
+            $reservedL12  = floatval($last12MonthsQuery->sum('reserved_amount'));
+            $spentL12     = floatval($last12MonthsQuery->sum('spent_amount'));
+
+            $last12 = [
+                'allocated' => $allocatedL12,
+                'reserved'  => $reservedL12,
+                'spent'     => $spentL12,
+                'available' => $allocatedL12 - $reservedL12 - $spentL12,
+            ];
+
+            // 2. For the year
+            $yearQuery = DepartmentBudget::where('department_id', $departmentId)
+                ->where('fiscal_year', $year);
+
+            $allocatedYr = floatval($yearQuery->sum('allocated_amount'));
+            $reservedYr  = floatval($yearQuery->sum('reserved_amount'));
+            $spentYr     = floatval($yearQuery->sum('spent_amount'));
+
+            $forYear = [
+                'allocated' => $allocatedYr,
+                'reserved'  => $reservedYr,
+                'spent'     => $spentYr,
+                'available' => $allocatedYr - $reservedYr - $spentYr,
+            ];
+
+            // 3. By quarter: 1-4, 4-6, 7-9, 10-12 (as requested, and standard Q1-Q4)
+            $quarters = [];
+            $quarterRanges = [
+                'q1_standard' => [1, 3],
+                'q1_user'     => [1, 4],  // 1-4
+                'q2_user'     => [4, 6],  // 4-6
+                'q3_user'     => [7, 9],  // 7-9
+                'q4_user'     => [10, 12], // 10-12
+            ];
+
+            foreach ($quarterRanges as $key => $range) {
+                $qQuery = DepartmentBudget::where('department_id', $departmentId)
+                    ->where('fiscal_year', $year)
+                    ->whereBetween('month', $range);
+
+                $allocQ = floatval($qQuery->sum('allocated_amount'));
+                $resQ   = floatval($qQuery->sum('reserved_amount'));
+                $spQ    = floatval($qQuery->sum('spent_amount'));
+
+                $quarters[$key] = [
+                    'allocated' => $allocQ,
+                    'reserved'  => $resQ,
+                    'spent'     => $spQ,
+                    'available' => $allocQ - $resQ - $spQ,
+                ];
+            }
+
+            return response()->json([
+                'department_id'   => $dept->id,
+                'department_name' => $dept->name,
+                'fiscal_year'     => (int) $year,
+                'calculations'    => [
+                    'last_12_months' => $last12,
+                    'for_year'       => $forYear,
+                    'quarters'       => $quarters,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Get department budget calculations failure: ' . $e->getMessage(), [
+                'department_id' => $departmentId,
+                'trace'         => $e->getTraceAsString(),
+            ]);
             return response()->json(['message' => 'An unexpected error occurred.'], 500);
         }
     }
