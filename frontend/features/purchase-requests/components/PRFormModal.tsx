@@ -12,6 +12,7 @@ interface PRFormData {
   dueDate: string;
   requestedBy: string;
   notes?: string;
+  files?: File[];
 }
 
 interface PRFormModalProps {
@@ -278,6 +279,31 @@ export default function PRFormModal({
                 rows={2}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
               />
+            </div>
+
+            {/* Attachments Upload */}
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-2">
+                Attach Files / Documents (Optional)
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setFormData({
+                      ...formData,
+                      files: Array.from(e.target.files),
+                    });
+                  }
+                }}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-slate-200 rounded-lg p-1.5"
+              />
+              {formData.files && formData.files.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Selected {formData.files.length} file(s): {formData.files.map(f => f.name).join(", ")}
+                </p>
+              )}
             </div>
           </div>
 

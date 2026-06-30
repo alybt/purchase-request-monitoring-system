@@ -19,6 +19,21 @@ export interface LineItem {
   vendor?: string;
 }
 
+export interface Attachment {
+  id: number;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_by?: number;
+  uploader?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  created_at?: string;
+  download_url?: string;
+}
+
 export interface PRData {
   id: string;
   prNumber: string;
@@ -33,6 +48,7 @@ export interface PRData {
   remarks?: string;
   lineItems?: LineItem[];
   statusHistory?: any[];
+  attachments?: Attachment[];
 }
 
 export function mapBackendPRToFrontend(pr: any): PRData {
@@ -65,6 +81,7 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     remarks: pr.remarks || pr.notes || "",
     lineItems: pr.items || pr.line_items || pr.purchase_request_items || [],
     statusHistory: pr.status_history || pr.statusHistory || [],
+    attachments: pr.attachments || [],
   };
 }
 
@@ -184,3 +201,68 @@ export async function bulkDeletePurchaseRequests(ids: string[]): Promise<void> {
     throw new Error(errData.message || "Failed to delete purchase requests");
   }
 }
+
+export async function uploadPRAttachments(id: string, files: File[]): Promise<PRData> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files[]", file);
+  });
+
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/attachments`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to upload attachments");
+  }
+
+  const resData = await response.json();
+  return mapBackendPRToFrontend(resData.purchase_request);
+}
+
+export async function deletePRAttachment(prId: string, attachmentId: number): Promise<PRData> {
+  const response = await fetch(`${API_URL}/purchase-requests/${prId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to delete attachment");
+  }
+
+  const resData = await response.json();
+  return mapBackendPRToFrontend(resData.purchase_request);
+}
+
+export async function downloadPRAttachment(prId: string, attachmentId: number, fileName: string): Promise<void> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const response = await fetch(`${API_URL}/purchase-requests/${prId}/attachments/${attachmentId}/download`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to download attachment");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+

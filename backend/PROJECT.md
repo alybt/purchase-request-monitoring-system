@@ -132,10 +132,13 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
     ]
   }
   ```
-* `GET /api/purchase-requests/{id}`: Fetch a PR with its `lineItems`, requester `user`, and approval history logs (`approvals.approver`).
+* `GET /api/purchase-requests/{id}`: Fetch a PR with its `lineItems`, requester `user`, `attachments`, and approval history logs (`approvals.approver`).
 * `PUT /api/purchase-requests/{id}`: Update PR details and its line items. (Overwrites existing line items).
 * `DELETE /api/purchase-requests/{id}`: Delete a PR.
 * `POST /api/purchase-requests/bulk-delete`: Delete multiple PRs. Required JSON body: `{"ids": [1, 2]}`.
+* `POST /api/purchase-requests/{id}/attachments`: Upload one or more supporting files (`files[]`) to a purchase request.
+* `GET /api/purchase-requests/{prId}/attachments/{attachmentId}/download`: Download a supporting file attachment.
+* `DELETE /api/purchase-requests/{prId}/attachments/{attachmentId}`: Delete an attachment.
 
 ### Approvals Workflow (`ApprovalController`)
 * `POST /api/purchase-requests/{id}/approve`: Approve a PR. Updates the PR status to `'Approved'` (backward compatible with `'Approve'`) and inserts an audit log into `purchase_request_status_history`. Also atomically increments the department's `reserved_amount`. Optional body: `{"remarks": "Approved budget"}`.

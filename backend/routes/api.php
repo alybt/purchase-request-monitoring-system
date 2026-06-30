@@ -42,6 +42,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/purchase-requests/{id}', [PurchaseRequestController::class, 'show']);
     Route::put('/purchase-requests/{id}', [PurchaseRequestController::class, 'update']);
     Route::delete('/purchase-requests/{id}', [PurchaseRequestController::class, 'destroy']);
+    Route::post('/purchase-requests/{id}/attachments', [PurchaseRequestController::class, 'uploadAttachments']);
+    Route::get('/purchase-requests/{prId}/attachments/{attachmentId}/download', [PurchaseRequestController::class, 'downloadAttachment']);
+    Route::delete('/purchase-requests/{prId}/attachments/{attachmentId}', [PurchaseRequestController::class, 'deleteAttachment']);
 
     // Budget
     Route::get('/budget/my-department', [BudgetController::class, 'myDepartmentBudget']);

@@ -65,7 +65,7 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'message' => 'Purchase request approved successfully.',
-                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -134,7 +134,7 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'message' => 'Purchase request rejected.',
-                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
