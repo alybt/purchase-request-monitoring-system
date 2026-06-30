@@ -183,39 +183,65 @@ class DepartmentController extends Controller
     {
         try {
             $currentYear = $request->input('fiscal_year', now()->year);
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
 
-            $budgets = DepartmentBudget::with('department')
-                ->where('fiscal_year', $currentYear)
-                ->get();
+            $departments = Department::with([
+                'departmentBudgets' => function ($q) use ($currentYear) {
+                    $q->where('fiscal_year', $currentYear);
+                }
+            ])->orderBy('name')->get();
 
-            // Group by department
-            $grouped = $budgets->groupBy('department_id');
+            $departmentSummaries = $departments->map(function ($dept) use ($month) {
+                $deptBudgets = $dept->departmentBudgets;
 
-            $totalAllocated = $budgets->sum(fn($b) => floatval($b->allocated_amount));
-            $totalReserved  = $budgets->sum(fn($b) => floatval($b->reserved_amount));
-            $totalSpent     = $budgets->sum(fn($b) => floatval($b->spent_amount));
-            $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
+                $activeBudgets = ($month !== null)
+                    ? $deptBudgets->where('month', $month)
+                    : $deptBudgets;
 
-            $departmentSummaries = $grouped->map(function ($deptBudgets, $deptId) use ($totalAllocated) {
-                $first = $deptBudgets->first();
-                $allocated = $deptBudgets->sum(fn($b) => floatval($b->allocated_amount));
-                $reserved  = $deptBudgets->sum(fn($b) => floatval($b->reserved_amount));
-                $spent     = $deptBudgets->sum(fn($b) => floatval($b->spent_amount));
-                
+                $allocated = floatval($activeBudgets->sum('allocated_amount'));
+                $reserved  = floatval($activeBudgets->sum('reserved_amount'));
+                $spent     = floatval($activeBudgets->sum('spent_amount'));
+
+                $monthlyBreakdown = [];
+                for ($m = 1; $m <= 12; $m++) {
+                    $mBudget = $deptBudgets->firstWhere('month', $m);
+                    $allocM = $mBudget ? floatval($mBudget->allocated_amount) : 0.0;
+                    $resM   = $mBudget ? floatval($mBudget->reserved_amount) : 0.0;
+                    $spM    = $mBudget ? floatval($mBudget->spent_amount) : 0.0;
+                    $monthlyBreakdown[] = [
+                        'month'     => $m,
+                        'allocated' => $allocM,
+                        'reserved'  => $resM,
+                        'spent'     => $spM,
+                        'available' => $allocM - $resM - $spM,
+                    ];
+                }
+
                 return [
-                    'department_id' => $deptId,
-                    'department'    => $first->department?->name ?? 'Unknown',
-                    'code'          => $first->department?->code ?? '',
-                    'allocated'     => $allocated,
-                    'reserved'      => $reserved,
-                    'spent'         => $spent,
-                    'available'     => $allocated - $reserved - $spent,
-                    'percentage'    => $totalAllocated > 0 ? round(($allocated / $totalAllocated) * 100, 1) : 0,
+                    'department_id'     => $dept->id,
+                    'department'        => $dept->name,
+                    'code'              => $dept->code,
+                    'allocated'         => $allocated,
+                    'reserved'          => $reserved,
+                    'spent'             => $spent,
+                    'available'         => $allocated - $reserved - $spent,
+                    'monthly_breakdown' => $monthlyBreakdown,
                 ];
             })->values();
 
+            $totalAllocated = $departmentSummaries->sum('allocated');
+            $totalReserved  = $departmentSummaries->sum('reserved');
+            $totalSpent     = $departmentSummaries->sum('spent');
+            $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
+
+            $departmentSummaries = $departmentSummaries->map(function ($summary) use ($totalAllocated) {
+                $summary['percentage'] = $totalAllocated > 0 ? round(($summary['allocated'] / $totalAllocated) * 100, 1) : 0;
+                return $summary;
+            });
+
             return response()->json([
                 'fiscal_year'          => (int) $currentYear,
+                'month'                => $month,
                 'total_allocated'      => $totalAllocated,
                 'total_reserved'       => $totalReserved,
                 'total_spent'          => $totalSpent,

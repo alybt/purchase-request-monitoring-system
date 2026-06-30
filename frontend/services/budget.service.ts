@@ -84,3 +84,71 @@ export async function getCategoryBudget(categoryId: number): Promise<CategoryBud
   const data = await response.json();
   return data.category_budget ?? null;
 }
+
+export interface MonthlyBreakdownItem {
+  month: number;
+  allocated: number;
+  reserved: number;
+  spent: number;
+  available: number;
+}
+
+export interface DeptSummaryWithBreakdown {
+  department_id: number;
+  department: string;
+  code: string;
+  allocated: number;
+  reserved: number;
+  spent: number;
+  available: number;
+  percentage: number;
+  monthly_breakdown?: MonthlyBreakdownItem[];
+}
+
+export interface BudgetSummaryResponse {
+  fiscal_year: number;
+  month: number | null;
+  total_allocated: number;
+  total_reserved: number;
+  total_spent: number;
+  total_available: number;
+  department_summaries: DeptSummaryWithBreakdown[];
+}
+
+export async function getBudgetSummary(fiscalYear?: number, month?: number | null): Promise<BudgetSummaryResponse> {
+  const params = new URLSearchParams();
+  if (fiscalYear) params.append("fiscal_year", String(fiscalYear));
+  if (month) params.append("month", String(month));
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${API_URL}/departments/budget-summary${queryString}`, {
+    method: "GET",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to fetch budget summary");
+  }
+
+  return response.json();
+}
+
+export async function updateDepartmentBudget(
+  departmentId: number,
+  data: { allocated_amount: number; fiscal_year?: number; month?: number }
+): Promise<any> {
+  const response = await fetch(`${API_URL}/departments/${departmentId}/budget`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(responseData.message || "Failed to update budget");
+  }
+
+  return responseData;
+}

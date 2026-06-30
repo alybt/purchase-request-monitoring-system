@@ -140,4 +140,47 @@ class DepartmentBudgetTest extends TestCase
             ]
         ]);
     }
+
+    public function test_can_retrieve_monthly_budget_summary_and_breakdown(): void
+    {
+        DepartmentBudget::create([
+            'department_id' => $this->department->id,
+            'fiscal_year' => 2026,
+            'month' => 5,
+            'allocated_amount' => 50000.00,
+            'reserved_amount' => 5000.00,
+            'spent_amount' => 10000.00,
+        ]);
+
+        DepartmentBudget::create([
+            'department_id' => $this->department->id,
+            'fiscal_year' => 2026,
+            'month' => 6,
+            'allocated_amount' => 80000.00,
+            'reserved_amount' => 8000.00,
+            'spent_amount' => 20000.00,
+        ]);
+
+        // 1. Check with month=6 filter
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/departments/budget-summary?fiscal_year=2026&month=6');
+
+        $response->assertStatus(200);
+        $this->assertEquals(6, $response->json('month'));
+        $this->assertEquals(80000.00, $response->json('total_allocated'));
+        $this->assertEquals(8000.00, $response->json('total_reserved'));
+        $this->assertEquals(20000.00, $response->json('total_spent'));
+        $this->assertEquals(52000.00, $response->json('total_available'));
+
+        // 2. Check monthly_breakdown structure inside department_summaries
+        $summaries = $response->json('department_summaries');
+        $this->assertCount(1, $summaries);
+        $this->assertCount(12, $summaries[0]['monthly_breakdown']);
+        
+        $month5Breakdown = collect($summaries[0]['monthly_breakdown'])->firstWhere('month', 5);
+        $this->assertEquals(50000.00, $month5Breakdown['allocated']);
+
+        $month6Breakdown = collect($summaries[0]['monthly_breakdown'])->firstWhere('month', 6);
+        $this->assertEquals(80000.00, $month6Breakdown['allocated']);
+    }
 }

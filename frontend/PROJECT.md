@@ -54,6 +54,7 @@ frontend/
 │   └── print.ts                            # Print engine and layouts for budgets and PR vouchers
 └── services/
     ├── auth.service.ts                     # Login, Logout session revocation, /api/me profile sync
+    ├── budget.service.ts                   # Budget summaries, monthly breakdowns, and department allocations
     ├── users.service.ts                    # User CRUD methods & search/filter query builders
     ├── purchase-requests.service.ts        # PR CRUD methods, mapping translations, and Approve/Reject requests
     └── dashboard.service.ts                # Metrics aggregator and Recent Pipeline queries
@@ -84,6 +85,12 @@ frontend/
 ### E. Reports & Analytics (`/dashboard/reports`)
 * Visualizes monthly spending trends using a custom responsive CSS/HTML vertical bar chart.
 * Maps department activity percentage breakdowns using inline horizontal progress-meters.
+
+### F. Admin Budget Management (`/admin/budget`)
+* Summarizes company-wide allocations, reserved amounts, and spending across departments.
+* Features a dynamic period filter supporting fiscal year selection and granular monthly filtering (Full Year or specific months 1–12).
+* Includes an interactive **12-Month Breakdown** view modal for each department showing monthly utilization progress bars and exact figures.
+* Allows administrators to set or update budget allocations targeted to specific months or the current period.
 
 ---
 

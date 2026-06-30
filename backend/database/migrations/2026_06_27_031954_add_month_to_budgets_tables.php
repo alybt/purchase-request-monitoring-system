@@ -11,17 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('company_budgets', function (Blueprint $table) {
-            $table->integer('month')->nullable()->after('fiscal_year');
-            $table->dropUnique(['fiscal_year']);
-            $table->unique(['fiscal_year', 'month']);
-        });
+        if (!Schema::hasColumn('company_budgets', 'month')) {
+            Schema::table('company_budgets', function (Blueprint $table) {
+                $table->integer('month')->nullable()->after('fiscal_year');
+                $table->dropUnique(['fiscal_year']);
+                $table->unique(['fiscal_year', 'month']);
+            });
+        }
 
-        Schema::table('department_budgets', function (Blueprint $table) {
-            $table->integer('month')->nullable()->after('fiscal_year');
-            $table->dropUnique(['department_id', 'fiscal_year']);
-            $table->unique(['department_id', 'fiscal_year', 'month']);
-        });
+        if (!Schema::hasColumn('department_budgets', 'month')) {
+            Schema::table('department_budgets', function (Blueprint $table) {
+                $table->integer('month')->nullable()->after('fiscal_year');
+                $table->dropUnique(['department_id', 'fiscal_year']);
+                $table->unique(['department_id', 'fiscal_year', 'month']);
+            });
+        }
     }
 
     /**

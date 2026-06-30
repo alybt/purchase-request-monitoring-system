@@ -109,7 +109,7 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
 * `POST /api/departments`: Create a department.
 * `PUT /api/departments/{id}`: Update department name/code.
 * `PUT /api/departments/{id}/budget`: Create or update a budget allocation for a specific month and fiscal year. Accepts: `allocated_amount` (required), `fiscal_year` (optional, default current year), `month` (optional, default current month).
-* `GET /api/departments/budget-summary`: Summarizes allocated, reserved, spent, and available budgets for all departments grouped for the current fiscal year.
+* `GET /api/departments/budget-summary`: Summarizes allocated, reserved, spent, and available budgets for all departments grouped for the current fiscal year. Supports optional `fiscal_year` and `month` query parameters to filter totals by a specific month. Each department summary also returns a `monthly_breakdown` array containing exact figures for each month (1 to 12).
 * `GET /api/departments/{id}/budget-calculations`: Fetch detailed budget calculations for a specific department:
   * **Last 12 Months**: Rolling 12-month summary of budget parameters.
   * **For the Year**: Sum of allocations/spending for the chosen fiscal year.
