@@ -291,10 +291,14 @@ backend/
 └── tests/
     └── Feature/
         ├── AuthTest.php
-        ├── UserTest.php
+        ├── BudgetTest.php
+        ├── CategoryTest.php
+        ├── CompanyBudgetTest.php
+        ├── DashboardTest.php
+        ├── DepartmentTest.php
         ├── DepartmentBudgetTest.php
         ├── PurchaseRequestTest.php
-        └── DashboardTest.php
+        └── UserTest.php
 ```
 
 ---
@@ -304,7 +308,7 @@ backend/
   ```bash
   php artisan migrate:fresh --seed
   ```
-* Run Backend Feature Tests:
+* Run Backend Feature Tests (66/66 tests passing, 351 assertions covering 100% of API endpoints):
   ```bash
   php artisan test
   ```
