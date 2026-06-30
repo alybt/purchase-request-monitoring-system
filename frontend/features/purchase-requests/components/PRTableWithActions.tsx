@@ -1,15 +1,6 @@
 "use client";
 
-interface PRData {
-  id: string;
-  prNumber: string;
-  department: string;
-  amount: number;
-  status: "pending" | "approved" | "rejected" | "completed";
-  requestedBy: string;
-  dateRequested: string;
-  dueDate: string;
-}
+import type { PRData } from "@/services/purchase-requests.service";
 
 interface PRTableWithActionsProps {
   data: PRData[];

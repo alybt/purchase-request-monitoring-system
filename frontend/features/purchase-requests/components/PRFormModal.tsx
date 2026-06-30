@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 
-interface PRFormData {
+export interface PRFormData {
   id?: string;
   prNumber?: string;
   department: string;
   amount: number;
   description: string;
-  status: "pending" | "approved" | "rejected" | "completed";
+  status: string;
   dueDate: string;
   requestedBy: string;
   notes?: string;

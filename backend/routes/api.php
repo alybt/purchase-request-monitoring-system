@@ -8,12 +8,13 @@ use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\CompanyBudgetController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/test-connection', function () {
     return response()->json([
-        'status' => 'Success',
+        'status'  => 'Success',
         'message' => 'Next.js and Laravel are officially talking!'
     ]);
 });
@@ -23,6 +24,9 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+    // Password change — accessible by any authenticated user
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
 
     // Users (Read accessible to authenticated users, mutations restricted to admin)
     Route::get('/users', [UserController::class, 'index']);
@@ -35,6 +39,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments', [DepartmentController::class, 'index']);
     Route::get('/departments/budget-summary', [DepartmentController::class, 'budgetSummary']);
     Route::get('/departments/{id}/budget-calculations', [DepartmentController::class, 'budgetCalculations']);
+
+    // Company Budget (read accessible, mutations restricted to admin)
+    Route::get('/company-budget', [CompanyBudgetController::class, 'index']);
+    Route::get('/company-budget/{fiscalYear}', [CompanyBudgetController::class, 'show']);
 
     // Purchase Requests
     Route::get('/purchase-requests', [PurchaseRequestController::class, 'index']);
@@ -62,6 +70,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/departments', [DepartmentController::class, 'store']);
         Route::put('/departments/{id}', [DepartmentController::class, 'update']);
         Route::put('/departments/{id}/budget', [DepartmentController::class, 'updateBudget']);
+        Route::delete('/departments/{id}/budget', [DepartmentController::class, 'destroyBudget']);
+        Route::post('/departments/budget/bulk-delete', [DepartmentController::class, 'bulkDestroyBudget']);
+        Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);
+        Route::post('/departments/bulk-delete', [DepartmentController::class, 'bulkDestroy']);
+
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+        Route::post('/categories/bulk-delete', [CategoryController::class, 'bulkDestroy']);
+
+        // Company Budget CRUD (admin only for mutations)
+        Route::post('/company-budget', [CompanyBudgetController::class, 'upsert']);
+        Route::delete('/company-budget/{fiscalYear}', [CompanyBudgetController::class, 'destroy']);
 
         Route::post('/purchase-requests/bulk-delete', [PurchaseRequestController::class, 'bulkDestroy']);
     });

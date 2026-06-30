@@ -29,9 +29,10 @@ export default function AdminReportsPage() {
         let approved = 0;
         let rejected = 0;
         prData.forEach(pr => {
-          if (pr.status === "pending") pending++;
-          else if (pr.status === "approved" || pr.status === "completed") approved++;
-          else if (pr.status === "rejected") rejected++;
+          const s = (pr.status || "").toLowerCase();
+          if (s === "pending" || s === "submitted" || s === "draft") pending++;
+          else if (s === "approved" || s === "completed" || s === "ordered" || s === "received" || s === "released") approved++;
+          else if (s === "rejected") rejected++;
         });
         setStatusCounts({ pending, approved, rejected });
       })

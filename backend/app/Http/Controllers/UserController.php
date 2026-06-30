@@ -73,15 +73,22 @@ class UserController extends Controller
     {
         try {
             $fields = $request->validate([
-                'first_name' => 'required|string|max:100',
-                'middle_name' => 'nullable|string|max:100',
-                'last_name' => 'required|string|max:100',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8',
-                'role' => 'nullable|string|in:admin,department_head,approver,employee',
-                'status' => 'nullable|string|in:active,dismissed,suspended',
-                'department' => 'nullable|string|max:100',
-                'department_id' => 'nullable|integer|exists:departments,id',
+                'first_name'              => 'required|string|max:100',
+                'middle_name'             => 'nullable|string|max:100',
+                'last_name'               => 'required|string|max:100',
+                'email'                   => 'required|string|email|max:255|unique:users',
+                'password'                => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'confirmed',         // requires password_confirmation field
+                    'regex:/[A-Za-z]/',  // at least one letter
+                    'regex:/[0-9]/',     // at least one number
+                ],
+                'role'                    => 'nullable|string|in:admin,department_head,approver,employee',
+                'status'                  => 'nullable|string|in:active,dismissed,suspended',
+                'department'              => 'nullable|string|max:100',
+                'department_id'           => 'nullable|integer|exists:departments,id',
             ]);
 
             if (isset($fields['department']) && !isset($fields['department_id'])) {
@@ -92,7 +99,6 @@ class UserController extends Controller
             }
             unset($fields['department']);
 
-            $fields['password'] = bcrypt($fields['password']);
             // Map legacy roles to department_head
             if (in_array($fields['role'] ?? '', ['approver', 'employee'])) {
                 $fields['role'] = 'department_head';
@@ -101,11 +107,15 @@ class UserController extends Controller
             }
             $fields['status'] = $fields['status'] ?? 'active';
 
+            // New users must change their temporary password on first login
+            $fields['must_change_password'] = true;
+            $fields['password_changed_at']  = null;
+
             $user = User::create($fields);
 
             return response()->json([
                 'message' => 'User created successfully.',
-                'user' => $user
+                'user'    => $user
             ], 201);
         } catch (ValidationException $e) {
             throw $e;
@@ -119,6 +129,7 @@ class UserController extends Controller
             ], 500);
         }
     }
+
 
     public function show($id)
     {

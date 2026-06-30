@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import UserTableWithActions from "@/features/users/components/UserTable";
 import UserFormModal from "@/features/users/components/AddUserModal";
 import ViewUserModal from "@/features/users/components/ViewUserModal";
-import DeleteUserModal from "@/features/users/components/DeleteUserModal";
+import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import {
   getUsers,
   createUser,
@@ -129,7 +129,7 @@ export default function UsersPage() {
           users.map((user) => (user.id === editingUser.id ? updated : user)),
         );
       } else {
-        const created = await createUser(data);
+        const created = await createUser(data as any);
         setUsers([created, ...users]);
       }
       setShowFormModal(false);
@@ -398,9 +398,10 @@ export default function UsersPage() {
         onClose={() => setShowViewModal(false)}
       />
 
-      <DeleteUserModal
+      <DeleteConfirmationModal
         isOpen={showDeleteModal}
         selectedCount={selectedRows.length}
+        entityName="User"
         onClose={() => {
           setShowDeleteModal(false);
           if (!isDeleteMode) {

@@ -347,4 +347,145 @@ class DepartmentController extends Controller
             return response()->json(['message' => 'An unexpected error occurred.'], 500);
         }
     }
+
+    public function destroy($id)
+    {
+        try {
+            $dept = Department::find($id);
+            if (!$dept) {
+                return response()->json(['message' => 'Department not found.'], 404);
+            }
+
+            // Optional: Check if department has users or budgets before deleting
+            // and prevent deletion if there are related records
+            if ($dept->users()->exists()) {
+                return response()->json(['message' => 'Cannot delete department with assigned users.'], 400);
+            }
+
+            $dept->delete();
+
+            return response()->json(['message' => 'Department deleted successfully.'], 200);
+        } catch (\Throwable $e) {
+            Log::error('Delete department failure: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        try {
+            $request->validate([
+                'ids'   => 'required|array',
+                'ids.*' => 'integer|exists:departments,id',
+            ]);
+
+            $ids = $request->input('ids');
+            
+            // Check for relations before bulk deleting
+            $departments = Department::whereIn('id', $ids)->get();
+            $undeletable = [];
+            $deletable = [];
+
+            foreach ($departments as $dept) {
+                if ($dept->users()->exists()) {
+                    $undeletable[] = $dept->name;
+                } else {
+                    $deletable[] = $dept->id;
+                }
+            }
+
+            if (!empty($deletable)) {
+                Department::whereIn('id', $deletable)->delete();
+            }
+
+            if (!empty($undeletable)) {
+                return response()->json([
+                    'message' => 'Some departments could not be deleted because they have assigned users: ' . implode(', ', $undeletable),
+                ], 400);
+            }
+
+            return response()->json(['message' => 'Departments deleted successfully.'], 200);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Bulk delete departments failure: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
+
+    public function destroyBudget(Request $request, $id)
+    {
+        try {
+            $fiscalYear = $request->input('fiscal_year', now()->year);
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
+
+            $query = DepartmentBudget::where('department_id', $id)
+                ->where('fiscal_year', $fiscalYear);
+            
+            if ($month) {
+                $query->where('month', $month);
+            }
+
+            // check if there's spent/reserved budget before deleting/resetting?
+            // "Delete" here means setting allocated_amount to 0, or just deleting the record if no spent/reserved.
+            $budgets = $query->get();
+
+            foreach ($budgets as $budget) {
+                if ($budget->reserved_amount > 0 || $budget->spent_amount > 0) {
+                    $budget->allocated_amount = $budget->reserved_amount + $budget->spent_amount;
+                    $budget->save();
+                } else {
+                    $budget->delete();
+                }
+            }
+
+            return response()->json(['message' => 'Budget reset successfully.'], 200);
+        } catch (\Throwable $e) {
+            Log::error('Delete department budget failure: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
+
+    public function bulkDestroyBudget(Request $request)
+    {
+        try {
+            $request->validate([
+                'ids'   => 'required|array',
+                'ids.*' => 'integer|exists:departments,id',
+                'fiscal_year' => 'required|integer',
+                'month' => 'nullable|integer',
+            ]);
+
+            $ids = $request->input('ids');
+            $fiscalYear = $request->input('fiscal_year');
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
+
+            $query = DepartmentBudget::whereIn('department_id', $ids)
+                ->where('fiscal_year', $fiscalYear);
+            
+            if ($month) {
+                $query->where('month', $month);
+            }
+
+            $budgets = $query->get();
+            $cantDeleteFull = [];
+
+            foreach ($budgets as $budget) {
+                if ($budget->reserved_amount > 0 || $budget->spent_amount > 0) {
+                    $budget->allocated_amount = $budget->reserved_amount + $budget->spent_amount;
+                    $budget->save();
+                    $cantDeleteFull[] = $budget->department_id;
+                } else {
+                    $budget->delete();
+                }
+            }
+
+            return response()->json(['message' => 'Budgets deleted/reset successfully.'], 200);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Bulk delete department budgets failure: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
 }

@@ -7,6 +7,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { BarChart, StatusDistribution } from "@/components/ui/DashboardCharts";
 import { getPurchaseRequests } from "@/services/purchase-requests.service";
+import { getCompanyBudget, getBudgetSummary } from "@/services/budget.service";
 import { getUsers } from "@/services/users.service";
 import type { PRData } from "@/services/purchase-requests.service";
 
@@ -47,14 +48,28 @@ export default function AdminDashboardPage() {
   const [prs, setPrs] = useState<PRData[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Mock budget data - will be replaced with API calls
-  const companyBudget = 10000000;
-  const allocatedBudget = 10000000;
-  const availableBudget = companyBudget - allocatedBudget;
+  const safeNum = (val: any): number => {
+    if (val === null || val === undefined || val === "") return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const [companyBudget, setCompanyBudget] = useState(0);
+  const [allocatedBudget, setAllocatedBudget] = useState(0);
+  const availableBudget = Math.max(0, safeNum(companyBudget) - safeNum(allocatedBudget));
 
   useEffect(() => {
-    getPurchaseRequests()
-      .then(setPrs)
+    const year = new Date().getFullYear();
+    Promise.all([
+      getPurchaseRequests().catch(() => []),
+      getCompanyBudget(year).catch(() => null),
+      getBudgetSummary(year).catch(() => null)
+    ])
+      .then(([prsData, cbData, summaryData]) => {
+        setPrs(prsData as PRData[]);
+        if (cbData) setCompanyBudget(safeNum(cbData.total_budget) + safeNum(cbData.carry_forward));
+        if (summaryData) setAllocatedBudget(safeNum(summaryData.total_allocated));
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -97,9 +112,9 @@ export default function AdminDashboardPage() {
         <>
           {/* Budget Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard title="Total Company Budget" value={`₱${companyBudget.toLocaleString()}`} icon={icons.budget} colorScheme="primary" subtitle="Fiscal Year 2026" />
-            <StatCard title="Total Allocated Budget" value={`₱${allocatedBudget.toLocaleString()}`} icon={icons.allocated} colorScheme="accent" subtitle="To departments" />
-            <StatCard title="Total Available Budget" value={`₱${availableBudget.toLocaleString()}`} icon={icons.available} colorScheme="gold" subtitle="Unallocated" />
+            <StatCard title="Total Company Budget" value={`₱${safeNum(companyBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.budget} colorScheme="primary" subtitle={`Fiscal Year ${new Date().getFullYear()}`} />
+            <StatCard title="Total Allocated Budget" value={`₱${safeNum(allocatedBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.allocated} colorScheme="accent" subtitle="To departments" />
+            <StatCard title="Total Available Budget" value={`₱${safeNum(availableBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.available} colorScheme="gold" subtitle="Unallocated" />
           </div>
 
           {/* PR Stat Cards */}

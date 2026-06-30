@@ -18,7 +18,8 @@ export interface UserResponse {
   email: string;
   role: "admin" | "department_head";
   status: "active" | "suspended" | "dismissed";
-  department: string;
+  department?: any;
+  department_id?: number | null;
   created_at: string;
 }
 
@@ -47,7 +48,7 @@ export function mapBackendUserToFrontend(user: UserResponse): UserData {
     last_name: user.last_name,
     name: fullName,
     email: user.email,
-    department: user.department || "",
+    department: user.department?.name || (typeof user.department === "string" ? user.department : ""),
     role: user.role,
     status: user.status === "suspended" ? "inactive" : "active",
     joinDate: user.created_at ? user.created_at.split("T")[0] : "",
@@ -91,6 +92,8 @@ export async function createUser(data: {
   department: string;
   role: string;
   status: string;
+  password: string;
+  password_confirmation: string;
 }): Promise<UserData> {
   const backendStatus = data.status === "inactive" ? "suspended" : data.status;
 
@@ -105,18 +108,22 @@ export async function createUser(data: {
       department: data.department,
       role: data.role,
       status: backendStatus,
-      password: "password123", // Default password for new users
+      password: data.password,
+      password_confirmation: data.password_confirmation,
     }),
   });
 
   if (!response.ok) {
     const errData = await response.json();
-    throw new Error(errData.message || "Failed to create user");
+    const err: any = new Error(errData.message || "Failed to create user");
+    err.errors = errData.errors || {};
+    throw err;
   }
 
   const resData = await response.json();
   return mapBackendUserToFrontend(resData.user);
 }
+
 
 export async function updateUser(
   id: string,

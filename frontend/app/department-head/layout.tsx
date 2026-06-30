@@ -18,6 +18,13 @@ export default function DepartmentHeadLayout({ children }: { children: React.Rea
         const { getCurrentUser } = await import("@/services/auth.service");
         const user = await getCurrentUser();
         localStorage.setItem("user", JSON.stringify(user));
+
+        // Block access to protected pages until password is changed
+        if (user.must_change_password) {
+          router.push("/change-password");
+          return;
+        }
+
         if (user.role !== "department_head") {
           router.push("/login");
         }
@@ -29,6 +36,7 @@ export default function DepartmentHeadLayout({ children }: { children: React.Rea
     }
     syncUser();
   }, [router]);
+
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">

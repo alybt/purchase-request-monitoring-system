@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import { DepartmentFormModal, DepartmentViewModal } from "@/features/departments/components/DepartmentModals";
+import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
+import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
 
 const API_URL = "http://127.0.0.1:8000/api";
 
@@ -9,7 +12,7 @@ function getHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return {
     "Content-Type": "application/json",
-    "Accept": "application/json",
+    Accept: "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
@@ -26,20 +29,36 @@ interface Department {
   fiscal_year: number;
 }
 
-const emptyForm = { name: "", code: "", description: "" };
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 export default function DepartmentManagementPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+
+  // Filters
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
+  const [filterMonth, setFilterMonth] = useState<number | null>(null);
+
+  // Modal states
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewDept, setViewDept] = useState<Department | null>(null);
   const [editDept, setEditDept] = useState<Department | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+
+  // Deletion state
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchDepts = () => {
     setLoading(true);
-    fetch(`${API_URL}/departments`, { headers: getHeaders() })
+    const params = new URLSearchParams({ fiscal_year: String(filterYear) });
+    if (filterMonth !== null) params.set("month", String(filterMonth));
+    fetch(`${API_URL}/departments?${params.toString()}`, { headers: getHeaders() })
       .then((r) => r.json())
       .then((data) => setDepartments(data.departments || []))
       .catch(console.error)
@@ -48,45 +67,82 @@ export default function DepartmentManagementPage() {
 
   useEffect(() => {
     fetchDepts();
-  }, []);
+  }, [filterYear, filterMonth]);
 
-  const openCreate = () => {
+  const handleCreateDept = async (form: { name: string; code: string; description: string }) => {
+    const res = await fetch(`${API_URL}/departments`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to create department");
+    setShowAdd(false);
+    fetchDepts();
+  };
+
+  const handleUpdateDept = async (form: { name: string; code: string; description: string }) => {
+    if (!editDept) return;
+    const res = await fetch(`${API_URL}/departments/${editDept.id}`, {
+      method: "PUT",
+      headers: getHeaders(),
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to update department");
     setEditDept(null);
-    setForm(emptyForm);
-    setError("");
-    setShowForm(true);
+    fetchDepts();
   };
 
-  const openEdit = (dept: Department) => {
-    setEditDept(dept);
-    setForm({ name: dept.name, code: dept.code, description: dept.description || "" });
-    setError("");
-    setShowForm(true);
+  const handleToggleDeleteMode = () => {
+    setIsDeleteMode(!isDeleteMode);
+    setSelectedRows([]);
   };
 
-  const handleSave = async () => {
-    if (!form.name.trim() || !form.code.trim()) {
-      setError("Name and code are required.");
-      return;
+  const toggleSelectAll = () => {
+    if (selectedRows.length === departments.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(departments.map((d) => d.id));
     }
-    setSaving(true);
-    setError("");
+  };
+
+  const toggleRow = (id: number) => {
+    if (selectedRows.includes(id)) {
+      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+    } else {
+      setSelectedRows([...selectedRows, id]);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleteError("");
     try {
-      const url = editDept ? `${API_URL}/departments/${editDept.id}` : `${API_URL}/departments`;
-      const method = editDept ? "PUT" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: getHeaders(),
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to save department");
-      setShowForm(false);
+      if (selectedRows.length > 1) {
+        const res = await fetch(`${API_URL}/departments/bulk-delete`, {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify({ ids: selectedRows }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to bulk delete");
+      } else {
+        const idToDelete = deptToDelete ? deptToDelete.id : selectedRows[0];
+        const res = await fetch(`${API_URL}/departments/${idToDelete}`, {
+          method: "DELETE",
+          headers: getHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to delete department");
+      }
+      setSelectedRows([]);
+      setShowDeleteModal(false);
+      setIsDeleteMode(false);
+      setDeptToDelete(null);
       fetchDepts();
-    } catch (e: any) {
-      setError(e.message || "Failed to save.");
-    } finally {
-      setSaving(false);
+    } catch (err: any) {
+      setDeleteError(err.message || "Failed to delete selected department(s).");
+      setShowDeleteModal(false);
     }
   };
 
@@ -98,21 +154,72 @@ export default function DepartmentManagementPage() {
         title="Department Management"
         subtitle="Manage departments and their budget allocations"
         breadcrumbs={[{ label: "Admin" }, { label: "Department Management" }]}
+        actions={
+          <div className="flex items-center gap-2">
+            {!isDeleteMode && (
+              <button
+                id="add-department-btn"
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Department
+              </button>
+            )}
+          </div>
+        }
       />
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm relative">
+          <span className="font-semibold">Error: </span>
+          {deleteError}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-secondary/50">Filter Period</p>
+        <div className="flex flex-wrap items-center gap-4">
+          <FiscalYearSelector
+            value={filterYear}
+            onChange={setFilterYear}
+            label="Fiscal Year"
+          />
+
+          {/* Month filter */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-secondary/60">Month</span>
+            <select
+              value={filterMonth === null ? "all" : filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value === "all" ? null : Number(e.target.value))}
+              className="px-3 py-2 text-xs font-bold text-secondary bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="all">All Months</option>
+              {MONTH_NAMES.map((name, idx) => (
+                <option key={idx + 1} value={idx + 1}>{name}</option>
+              ))}
+            </select>
+          </div>
+
+          {filterMonth !== null && (
+            <span className="self-end inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/60">
+              {MONTH_NAMES[filterMonth - 1]} {filterYear}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Department Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-bold text-secondary">Departments</h3>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Department
-          </button>
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h3 className="text-base font-bold text-secondary">
+            Departments
+            {filterMonth !== null
+              ? ` — ${MONTH_NAMES[filterMonth - 1]} ${filterYear}`
+              : ` — FY ${filterYear}`}
+          </h3>
         </div>
         <div className="overflow-x-auto">
           {loading ? (
@@ -123,31 +230,110 @@ export default function DepartmentManagementPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-xs text-secondary/50 uppercase font-semibold tracking-wider">
+                  {isDeleteMode && (
+                    <th className="px-6 py-3 text-left w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.length === departments.length && departments.length > 0}
+                        onChange={toggleSelectAll}
+                        className="rounded cursor-pointer border-slate-300 text-primary focus:ring-primary/20"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left">Department</th>
                   <th className="px-6 py-3 text-left">Code</th>
-                  <th className="px-6 py-3 text-left">Budget (FY {departments[0]?.fiscal_year})</th>
+                  <th className="px-6 py-3 text-left">Allocated</th>
                   <th className="px-6 py-3 text-left">Available</th>
-                  <th className="px-6 py-3 text-left">Actions</th>
+                  <th className="px-6 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {!isDeleteMode ? (
+                        <button
+                          onClick={handleToggleDeleteMode}
+                          className="px-2.5 py-1.5 text-red-600 font-semibold hover:bg-red-50 rounded-lg transition-colors text-xs"
+                          title="Enable Bulk Delete"
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={handleToggleDeleteMode}
+                            className="px-2.5 py-1.5 text-secondary hover:bg-slate-100 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteModal(true)}
+                            className="px-2.5 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-xs font-bold transition-colors"
+                          >
+                            Delete ({selectedRows.length})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {departments.map((dept) => (
-                  <tr key={dept.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={dept.id} className={`hover:bg-slate-50 transition-colors ${isDeleteMode && selectedRows.includes(dept.id) ? "bg-blue-50/50" : ""}`}>
+                    {isDeleteMode && (
+                      <td className="px-6 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(dept.id)}
+                          onChange={() => toggleRow(dept.id)}
+                          className="rounded cursor-pointer border-slate-300 text-primary focus:ring-primary/20"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-3 font-semibold text-secondary">{dept.name}</td>
                     <td className="px-6 py-3 font-mono text-secondary/70">{dept.code}</td>
                     <td className="px-6 py-3 font-semibold text-secondary">
-                      {dept.budget_allocation > 0 ? `₱${dept.budget_allocation.toLocaleString()}` : <span className="text-secondary/40">Not set</span>}
+                      {dept.budget_allocation > 0
+                        ? `₱${dept.budget_allocation.toLocaleString()}`
+                        : <span className="text-secondary/40">Not set</span>}
                     </td>
                     <td className="px-6 py-3 text-emerald-600 font-semibold">
-                      {dept.budget_allocation > 0 ? `₱${dept.available_budget.toLocaleString()}` : "—"}
+                      {dept.budget_allocation > 0
+                        ? `₱${dept.available_budget.toLocaleString()}`
+                        : "—"}
                     </td>
                     <td className="px-6 py-3">
-                      <button
-                        onClick={() => openEdit(dept)}
-                        className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setViewDept(dept)}
+                          className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setEditDept(dept)}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit Department"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeptToDelete(dept);
+                            setSelectedRows([dept.id]);
+                            setShowDeleteModal(true);
+                          }}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Department"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -155,6 +341,7 @@ export default function DepartmentManagementPage() {
               {totalAllocated > 0 && (
                 <tfoot>
                   <tr className="border-t border-slate-200 bg-slate-50">
+                    {isDeleteMode && <td />}
                     <td className="px-6 py-3 font-bold text-secondary">Total</td>
                     <td />
                     <td className="px-6 py-3 font-bold text-secondary">₱{totalAllocated.toLocaleString()}</td>
@@ -167,70 +354,48 @@ export default function DepartmentManagementPage() {
         </div>
       </div>
 
-      {/* Create / Edit Form */}
-      {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="text-base font-bold text-secondary">{editDept ? "Edit Department" : "Create Department"}</h3>
-          </div>
-          <div className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">Department Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  placeholder="e.g. Information Technology"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">Department Code <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={form.code}
-                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary uppercase"
-                  placeholder="e.g. IT"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-secondary mb-2">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                  rows={3}
-                  placeholder="Optional description"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-secondary hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-colors disabled:opacity-60"
-              >
-                {saving ? "Saving..." : editDept ? "Save Changes" : "Create Department"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add Department Modal */}
+      <DepartmentFormModal
+        isOpen={showAdd}
+        isEditMode={false}
+        onClose={() => setShowAdd(false)}
+        onSubmit={handleCreateDept}
+      />
 
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700">
-        <strong>Note:</strong> Budget allocations are set per fiscal year. Contact your system administrator to configure department budget amounts in the database.
-      </div>
+      {/* View Department Modal */}
+      <DepartmentViewModal
+        isOpen={!!viewDept}
+        department={viewDept}
+        onClose={() => setViewDept(null)}
+        onEdit={() => {
+          const d = viewDept;
+          setViewDept(null);
+          setEditDept(d);
+        }}
+      />
+
+      {/* Edit Department Modal */}
+      <DepartmentFormModal
+        isOpen={!!editDept}
+        isEditMode={true}
+        initialData={editDept}
+        onClose={() => setEditDept(null)}
+        onSubmit={handleUpdateDept}
+      />
+      {/* Delete Department Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        selectedCount={selectedRows.length}
+        entityName="Department"
+        onClose={() => {
+          setShowDeleteModal(false);
+          if (!isDeleteMode) {
+            setDeptToDelete(null);
+            setSelectedRows([]);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

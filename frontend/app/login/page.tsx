@@ -24,7 +24,13 @@ export default function LoginPage() {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         const role = data.user.role as "admin" | "department_head";
-        router.push(roleHomePath(role));
+
+        // If the user must change their password, redirect to the change-password page
+        if (data.user.must_change_password) {
+          router.push("/change-password");
+        } else {
+          router.push(roleHomePath(role));
+        }
       } else {
         setError(data.message || "Invalid credentials. Please try again.");
       }
@@ -34,6 +40,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#1a251f] flex">

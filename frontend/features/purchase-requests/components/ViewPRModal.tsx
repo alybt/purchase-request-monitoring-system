@@ -3,25 +3,14 @@
 import { useState, useEffect } from "react";
 import { printPurchaseRequest } from "@/lib/print";
 
-interface PRData {
-  id: string;
-  prNumber: string;
-  department: string;
-  amount: number;
-  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed";
-  requestedBy: string;
-  dateRequested: string;
-  dueDate: string;
-  description?: string;
-  notes?: string;
-  lineItems?: any[];
-  statusHistory?: any[];
-}
+import type { PRData } from "@/services/purchase-requests.service";
 
 interface ViewPRModalProps {
   isOpen: boolean;
   pr: PRData | null;
   onClose: () => void;
+  onApprove?: (id: string, comments: string) => Promise<void> | void;
+  onReject?: (id: string, comments: string) => Promise<void> | void;
 }
 
 const getStatusColor = (status: string) => {
@@ -51,6 +40,8 @@ export default function ViewPRModal({
   isOpen,
   pr,
   onClose,
+  onApprove,
+  onReject,
 }: ViewPRModalProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -255,8 +246,24 @@ export default function ViewPRModal({
             </div>
           )}
 
-          {/* Close & Print Buttons */}
-          <div className="pt-4 border-t border-slate-200 flex gap-3">
+          {/* Close, Approve, Reject & Print Buttons */}
+          <div className="pt-4 border-t border-slate-200 flex flex-wrap gap-3">
+            {onApprove && pr.status?.toLowerCase() === "submitted" && (
+              <button
+                onClick={() => onApprove(pr.id, "Approved via View Modal")}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
+              >
+                Approve
+              </button>
+            )}
+            {onReject && pr.status?.toLowerCase() === "submitted" && (
+              <button
+                onClick={() => onReject(pr.id, "Rejected via View Modal")}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+              >
+                Reject
+              </button>
+            )}
             <button
               onClick={() => printPurchaseRequest(pr)}
               className="flex-1 bg-slate-100 text-secondary border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"

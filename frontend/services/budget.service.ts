@@ -152,3 +152,59 @@ export async function updateDepartmentBudget(
 
   return responseData;
 }
+
+// ─── Company Budget ───────────────────────────────────────────────────────────
+
+export interface CompanyBudget {
+  id: number;
+  fiscal_year: number;
+  total_budget: number;
+  carry_forward: number;
+  allocated_amount: number;
+  available_amount: number;
+}
+
+export async function getAllCompanyBudgets(): Promise<CompanyBudget[]> {
+  const response = await fetch(`${API_URL}/company-budget`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to fetch company budgets");
+  }
+  const data = await response.json();
+  return data.budgets || [];
+}
+
+export async function getCompanyBudget(fiscalYear: number): Promise<CompanyBudget | null> {
+  const response = await fetch(`${API_URL}/company-budget/${fiscalYear}`, {
+    headers: getHeaders(),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to fetch company budget");
+  }
+  const data = await response.json();
+  return data.budget ?? null;
+}
+
+export async function upsertCompanyBudget(
+  fiscalYear: number,
+  totalBudget: number,
+  carryForward: number = 0
+): Promise<CompanyBudget> {
+  const response = await fetch(`${API_URL}/company-budget`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ fiscal_year: fiscalYear, total_budget: totalBudget, carry_forward: carryForward }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err: any = new Error(data.message || "Failed to save company budget");
+    err.errors = data.errors || {};
+    throw err;
+  }
+  return data.budget;
+}
+

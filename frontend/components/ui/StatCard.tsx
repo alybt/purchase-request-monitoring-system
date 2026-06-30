@@ -7,7 +7,7 @@ interface StatCardProps {
   value: string | number;
   subtitle?: string;
   icon: ReactNode;
-  colorScheme?: "primary" | "gold" | "accent" | "red" | "blue" | "purple";
+  colorScheme?: "primary" | "gold" | "accent" | "red" | "blue" | "purple" | "emerald";
   trend?: { value: number; label: string };
 }
 
@@ -47,6 +47,12 @@ const schemes = {
     iconBg: "bg-purple-100 border-purple-200 text-purple-600",
     label: "text-purple-600",
     trend: "text-purple-500",
+  },
+  emerald: {
+    bg: "bg-emerald-50 border-emerald-200 hover:border-emerald-300",
+    iconBg: "bg-emerald-100 border-emerald-200 text-emerald-600",
+    label: "text-emerald-700",
+    trend: "text-emerald-600",
   },
 };
 

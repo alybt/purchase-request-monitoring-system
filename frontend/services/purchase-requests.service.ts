@@ -25,12 +25,13 @@ export interface PRData {
   department: string;
   category?: string;
   amount: number;
-  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed";
+  status: string;
   requestedBy: string;
   dateRequested: string;
   dueDate: string;
   description?: string;
   remarks?: string;
+  notes?: string;
   lineItems?: LineItem[];
   statusHistory?: any[];
 }
@@ -63,6 +64,7 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     dueDate,
     description: pr.purpose || pr.purpose_of_requests || "",
     remarks: pr.remarks || pr.notes || "",
+    notes: pr.remarks || pr.notes || "",
     lineItems: pr.items || pr.line_items || pr.purchase_request_items || [],
     statusHistory: pr.status_history || pr.statusHistory || [],
   };
@@ -184,3 +186,28 @@ export async function bulkDeletePurchaseRequests(ids: string[]): Promise<void> {
     throw new Error(errData.message || "Failed to delete purchase requests");
   }
 }
+
+export async function approvePurchaseRequest(id: string, comments?: string): Promise<void> {
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/approve`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ comments: comments || "" }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to approve purchase request");
+  }
+}
+
+export async function rejectPurchaseRequest(id: string, comments?: string): Promise<void> {
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/reject`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ comments: comments || "" }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to reject purchase request");
+  }
+}
+

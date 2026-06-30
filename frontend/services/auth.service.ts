@@ -51,3 +51,32 @@ export async function getCurrentUser(): Promise<any> {
   const data = await response.json();
   return data.user;
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  newPasswordConfirmation: string
+): Promise<any> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const response = await fetch(`${API_URL}/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+      new_password_confirmation: newPasswordConfirmation,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const err: any = new Error(data.message || "Failed to change password");
+    err.errors = data.errors || {};
+    throw err;
+  }
+  return data;
+}
