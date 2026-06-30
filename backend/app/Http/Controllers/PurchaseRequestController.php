@@ -411,8 +411,9 @@ class PurchaseRequestController extends Controller
                 return response()->json(['message' => 'Attachment file not found.'], 404);
             }
 
-            return \Illuminate\Support\Facades\Storage::disk('local')->download(
-                $attachment->file_path,
+            $absolutePath = \Illuminate\Support\Facades\Storage::disk('local')->path($attachment->file_path);
+            return response()->download(
+                $absolutePath,
                 $attachment->file_name,
                 ['Content-Type' => $attachment->file_type]
             );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCategories, Category } from "../../../../services/budget.service";
+import { getCategories, Category } from "@/services/budget.service";
 
 interface PRFormData {
   id?: string;
@@ -56,7 +56,7 @@ export default function PRFormModal({
   useEffect(() => {
     if (isOpen) {
       getCategories()
-        .then((cats) => setCategories(cats))
+        .then((cats: Category[]) => setCategories(cats))
         .catch(() => setCategories([]));
     }
   }, [isOpen]);
