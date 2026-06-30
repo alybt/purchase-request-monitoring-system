@@ -34,20 +34,36 @@ export interface Attachment {
   download_url?: string;
 }
 
+export interface StatusHistoryItem {
+  id?: number;
+  purchase_request_id?: number;
+  from_status?: string | null;
+  to_status: string;
+  changed_by?: number;
+  changer?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  remarks?: string | null;
+  created_at?: string;
+}
+
 export interface PRData {
   id: string;
   prNumber: string;
   department: string;
   category?: string;
+  categoryId?: number;
   amount: number;
-  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed";
+  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed" | "pending" | string;
   requestedBy: string;
   dateRequested: string;
   dueDate: string;
   description?: string;
   remarks?: string;
   lineItems?: LineItem[];
-  statusHistory?: any[];
+  statusHistory?: StatusHistoryItem[];
   attachments?: Attachment[];
 }
 
@@ -72,6 +88,7 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     prNumber: pr.pr_number,
     department: departmentName,
     category: pr.category?.name || "",
+    categoryId: pr.category_id || pr.category?.id,
     amount: parseFloat(pr.total_estimated_cost) || 0,
     status,
     requestedBy: requesterName,
@@ -120,13 +137,15 @@ export async function getPurchaseRequestDetails(id: string): Promise<PRData> {
   return mapBackendPRToFrontend(data.purchase_request);
 }
 
-export async function createPurchaseRequest(data: { description: string; amount: number }): Promise<PRData> {
+export async function createPurchaseRequest(data: { description: string; amount: number; category_id?: number; lineItems?: LineItem[] }): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({
       purpose_of_requests: data.description,
-      line_items: [
+      purpose: data.description,
+      category_id: data.category_id || null,
+      line_items: data.lineItems && data.lineItems.length > 0 ? data.lineItems : [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
           description: data.description,
@@ -147,14 +166,15 @@ export async function createPurchaseRequest(data: { description: string; amount:
   return mapBackendPRToFrontend(resData.purchase_request);
 }
 
-export async function updatePurchaseRequest(id: string, data: { description: string; amount: number; status?: string }): Promise<PRData> {
+export async function updatePurchaseRequest(id: string, data: { description: string; amount: number; status?: string; category_id?: number; lineItems?: LineItem[] }): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "PUT",
     headers: getHeaders(),
     body: JSON.stringify({
       purpose: data.description,
       status: data.status,
-      line_items: [
+      category_id: data.category_id || null,
+      line_items: data.lineItems && data.lineItems.length > 0 ? data.lineItems : [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
           description: data.description,

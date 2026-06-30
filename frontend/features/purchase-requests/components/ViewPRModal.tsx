@@ -2,23 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { printPurchaseRequest } from "@/lib/print";
-import { downloadPRAttachment, uploadPRAttachments, deletePRAttachment, Attachment } from "@/services/purchase-requests.service";
-
-interface PRData {
-  id: string;
-  prNumber: string;
-  department: string;
-  amount: number;
-  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed";
-  requestedBy: string;
-  dateRequested: string;
-  dueDate: string;
-  description?: string;
-  notes?: string;
-  lineItems?: any[];
-  statusHistory?: any[];
-  attachments?: Attachment[];
-}
+import { downloadPRAttachment, uploadPRAttachments, deletePRAttachment, Attachment, PRData } from "@/services/purchase-requests.service";
 
 interface ViewPRModalProps {
   isOpen: boolean;
@@ -166,14 +150,22 @@ export default function ViewPRModal({
             </div>
           </div>
 
-          {/* Department and Amount */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Department, Category, and Amount */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
                 Department
               </p>
               <p className="text-sm font-medium text-secondary">
                 {pr.department}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                Category
+              </p>
+              <p className="text-sm font-medium text-secondary">
+                {pr.category || "General"}
               </p>
             </div>
             <div>
@@ -371,6 +363,33 @@ export default function ViewPRModal({
               )}
             </div>
           </div>
+
+          {/* Status History Audit Trail */}
+          {pr.statusHistory && pr.statusHistory.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                Status History / Audit Trail
+              </p>
+              <div className="space-y-3 pl-2 border-l-2 border-primary/20">
+                {pr.statusHistory.map((hist: any, index: number) => (
+                  <div key={hist.id || index} className="relative pl-4">
+                    <div className="absolute -left-[11px] top-1 w-2 h-2 rounded-full bg-primary" />
+                    <div className="flex items-center justify-between text-xs font-semibold text-secondary">
+                      <span className="capitalize">{hist.to_status}</span>
+                      <span className="text-[10px] font-normal text-slate-400">
+                        {hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}
+                      </span>
+                    </div>
+                    {hist.remarks && (
+                      <p className="text-xs text-slate-500 mt-0.5 italic">
+                        "{hist.remarks}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions Footer */}
           <div className="pt-4 border-t border-slate-200 flex flex-wrap gap-3">

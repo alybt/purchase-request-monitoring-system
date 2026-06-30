@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
+use App\Models\PurchaseRequestStatusHistory;
+use App\Models\DepartmentCategoryBudget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -115,6 +117,14 @@ class PurchaseRequestController extends Controller
                 }
 
                 $pr->update(['total_estimated_cost' => $totalCost]);
+
+                PurchaseRequestStatusHistory::create([
+                    'purchase_request_id' => $pr->id,
+                    'from_status' => null,
+                    'to_status' => $pr->status,
+                    'changed_by' => $user->id,
+                    'remarks' => 'Purchase request created',
+                ]);
 
                 return $pr;
             });
@@ -229,6 +239,16 @@ class PurchaseRequestController extends Controller
                 }
 
                 $newStatus = $pr->status;
+                if ($newStatus !== $oldStatus) {
+                    PurchaseRequestStatusHistory::create([
+                        'purchase_request_id' => $pr->id,
+                        'from_status' => $oldStatus,
+                        'to_status' => $newStatus,
+                        'changed_by' => $request->user()?->id ?? $pr->requested_by,
+                        'remarks' => $request->input('remarks', "Status updated to {$newStatus}"),
+                    ]);
+                }
+
                 if (in_array($newStatus, ['Released', 'Received', 'Completed']) && !in_array($oldStatus, ['Released', 'Received', 'Completed'])) {
                     if ($pr->department_id) {
                         $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
@@ -239,6 +259,17 @@ class PurchaseRequestController extends Controller
                         if ($budget) {
                             $budget->decrement('reserved_amount', $pr->total_estimated_cost);
                             $budget->increment('spent_amount', $pr->total_estimated_cost);
+
+                            if ($pr->category_id) {
+                                $catBudget = DepartmentCategoryBudget::where('department_budget_id', $budget->id)
+                                    ->where('category_id', $pr->category_id)
+                                    ->lockForUpdate()
+                                    ->first();
+                                if ($catBudget) {
+                                    $catBudget->decrement('reserved_amount', $pr->total_estimated_cost);
+                                    $catBudget->increment('spent_amount', $pr->total_estimated_cost);
+                                }
+                            }
                         }
                     }
                 }

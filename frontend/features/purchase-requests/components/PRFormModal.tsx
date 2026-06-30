@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getCategories, Category } from "../../../../services/budget.service";
 
 interface PRFormData {
   id?: string;
   prNumber?: string;
   department: string;
+  category?: string;
+  category_id?: number;
   amount: number;
   description: string;
   status: "pending" | "approved" | "rejected" | "completed";
@@ -32,9 +35,13 @@ export default function PRFormModal({
   onClose,
   onSubmit,
 }: PRFormModalProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [formData, setFormData] = useState<PRFormData>(
     initialData || {
       department: "IT",
+      category: "",
+      category_id: undefined,
       amount: 0,
       description: "",
       status: "pending",
@@ -45,6 +52,14 @@ export default function PRFormModal({
   );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      getCategories()
+        .then((cats) => setCategories(cats))
+        .catch(() => setCategories([]));
+    }
+  }, [isOpen]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -73,10 +88,20 @@ export default function PRFormModal({
     >,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "amount" ? parseFloat(value) || 0 : value,
-    }));
+    if (name === "category_id") {
+      const catId = value ? parseInt(value, 10) : undefined;
+      const catObj = categories.find((c) => c.id === catId);
+      setFormData((prev) => ({
+        ...prev,
+        category_id: catId,
+        category: catObj ? catObj.name : "",
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: name === "amount" ? parseFloat(value) || 0 : value,
+      }));
+    }
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -158,6 +183,26 @@ export default function PRFormModal({
                 {errors.department && (
                   <p className="text-red-500 text-xs mt-1">{errors.department}</p>
                 )}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Budget Category
+                </label>
+                <select
+                  name="category_id"
+                  value={formData.category_id || ""}
+                  onChange={handleChange}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                >
+                  <option value="">Select Category (Optional)</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name} ({cat.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Amount */}
