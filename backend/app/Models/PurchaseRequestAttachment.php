@@ -11,9 +11,21 @@ class PurchaseRequestAttachment extends Model
 {
     use HasFactory;
 
+    public const UPDATED_AT = null;
+
+    protected $with = ['uploader'];
+
+    protected $appends = ['download_url'];
+
     protected $casts = [
         'file_size' => 'integer',
+        'created_at' => 'datetime',
     ];
+
+    public function getDownloadUrlAttribute(): string
+    {
+        return url("/api/purchase-requests/{$this->purchase_request_id}/attachments/{$this->id}/download");
+    }
 
     public function purchaseRequest()
     {
@@ -25,3 +37,4 @@ class PurchaseRequestAttachment extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 }
+

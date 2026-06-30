@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getCategories, Category } from "@/services/budget.service";
 
 export interface PRFormData {
   id?: string;
   prNumber?: string;
   department: string;
+  category?: string;
+  category_id?: number;
   amount: number;
   description: string;
   status: string;
   dueDate: string;
   requestedBy: string;
   notes?: string;
+  files?: File[];
 }
 
 interface PRFormModalProps {
@@ -31,9 +35,13 @@ export default function PRFormModal({
   onClose,
   onSubmit,
 }: PRFormModalProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [formData, setFormData] = useState<PRFormData>(
     initialData || {
       department: "IT",
+      category: "",
+      category_id: undefined,
       amount: 0,
       description: "",
       status: "pending",
@@ -44,6 +52,14 @@ export default function PRFormModal({
   );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      getCategories()
+        .then((cats: Category[]) => setCategories(cats))
+        .catch(() => setCategories([]));
+    }
+  }, [isOpen]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -72,10 +88,20 @@ export default function PRFormModal({
     >,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "amount" ? parseFloat(value) || 0 : value,
-    }));
+    if (name === "category_id") {
+      const catId = value ? parseInt(value, 10) : undefined;
+      const catObj = categories.find((c) => c.id === catId);
+      setFormData((prev) => ({
+        ...prev,
+        category_id: catId,
+        category: catObj ? catObj.name : "",
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: name === "amount" ? parseFloat(value) || 0 : value,
+      }));
+    }
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -157,6 +183,26 @@ export default function PRFormModal({
                 {errors.department && (
                   <p className="text-red-500 text-xs mt-1">{errors.department}</p>
                 )}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Budget Category
+                </label>
+                <select
+                  name="category_id"
+                  value={formData.category_id || ""}
+                  onChange={handleChange}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                >
+                  <option value="">Select Category (Optional)</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name} ({cat.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Amount */}
@@ -278,6 +324,31 @@ export default function PRFormModal({
                 rows={2}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
               />
+            </div>
+
+            {/* Attachments Upload */}
+            <div>
+              <label className="block text-sm font-semibold text-secondary mb-2">
+                Attach Files / Documents (Optional)
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setFormData({
+                      ...formData,
+                      files: Array.from(e.target.files),
+                    });
+                  }
+                }}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-slate-200 rounded-lg p-1.5"
+              />
+              {formData.files && formData.files.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Selected {formData.files.length} file(s): {formData.files.map(f => f.name).join(", ")}
+                </p>
+              )}
             </div>
           </div>
 

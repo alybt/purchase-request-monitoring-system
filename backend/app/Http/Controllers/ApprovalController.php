@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestStatusHistory;
+use App\Models\DepartmentCategoryBudget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -59,13 +60,23 @@ class ApprovalController extends Controller
                         ->first();
                     if ($budget) {
                         $budget->increment('reserved_amount', $pr->total_estimated_cost);
+
+                        if ($pr->category_id) {
+                            $catBudget = DepartmentCategoryBudget::where('department_budget_id', $budget->id)
+                                ->where('category_id', $pr->category_id)
+                                ->lockForUpdate()
+                                ->first();
+                            if ($catBudget) {
+                                $catBudget->increment('reserved_amount', $pr->total_estimated_cost);
+                            }
+                        }
                     }
                 }
             });
 
             return response()->json([
                 'message' => 'Purchase request approved successfully.',
-                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -127,6 +138,16 @@ class ApprovalController extends Controller
                             ->first();
                         if ($budget) {
                             $budget->decrement('reserved_amount', $pr->total_estimated_cost);
+
+                            if ($pr->category_id) {
+                                $catBudget = DepartmentCategoryBudget::where('department_budget_id', $budget->id)
+                                    ->where('category_id', $pr->category_id)
+                                    ->lockForUpdate()
+                                    ->first();
+                                if ($catBudget) {
+                                    $catBudget->decrement('reserved_amount', $pr->total_estimated_cost);
+                                }
+                            }
                         }
                     }
                 }
@@ -134,7 +155,7 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'message' => 'Purchase request rejected.',
-                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;

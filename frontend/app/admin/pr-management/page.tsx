@@ -9,7 +9,7 @@ import PRTableWithActions from "@/features/purchase-requests/components/PRTableW
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
 import PRFormModal from "@/features/purchase-requests/components/PRFormModal";
 import DeletePRModal from "@/features/purchase-requests/components/DeletePRModal";
-import { getPurchaseRequests, updatePurchaseRequest, bulkDeletePurchaseRequests } from "@/services/purchase-requests.service";
+import { getPurchaseRequests, updatePurchaseRequest, bulkDeletePurchaseRequests, uploadPRAttachments } from "@/services/purchase-requests.service";
 import type { PRData } from "@/services/purchase-requests.service";
 
 export default function AdminPRManagementPage() {
@@ -43,7 +43,10 @@ export default function AdminPRManagementPage() {
   const handleEdit = async (data: any) => {
     if (!editPR) return;
     try {
-      const updatedPR = await updatePurchaseRequest(editPR.id, data);
+      let updatedPR = await updatePurchaseRequest(editPR.id, data);
+      if (data.files && data.files.length > 0) {
+        updatedPR = await uploadPRAttachments(editPR.id, data.files);
+      }
       setPrs((prev) =>
         prev.map((p) => (p.id === editPR.id ? updatedPR : p))
       );

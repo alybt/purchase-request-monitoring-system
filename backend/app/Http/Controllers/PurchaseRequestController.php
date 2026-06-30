@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
+use App\Models\PurchaseRequestStatusHistory;
+use App\Models\DepartmentCategoryBudget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +16,7 @@ class PurchaseRequestController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory']);
+            $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory', 'attachments']);
 
             // Filter by status
             if ($request->filled('status')) {
@@ -116,12 +118,20 @@ class PurchaseRequestController extends Controller
 
                 $pr->update(['total_estimated_cost' => $totalCost]);
 
+                PurchaseRequestStatusHistory::create([
+                    'purchase_request_id' => $pr->id,
+                    'from_status' => null,
+                    'to_status' => $pr->status,
+                    'changed_by' => $user->id,
+                    'remarks' => 'Purchase request created',
+                ]);
+
                 return $pr;
             });
 
             return response()->json([
                 'message' => 'Purchase request created successfully.',
-                'purchase_request' => $purchaseRequest->load(['items', 'requester', 'department', 'category'])
+                'purchase_request' => $purchaseRequest->load(['items', 'requester', 'department', 'category', 'attachments'])
             ], 201);
         } catch (ValidationException $e) {
             throw $e;
@@ -139,7 +149,7 @@ class PurchaseRequestController extends Controller
     public function show($id)
     {
         try {
-            $pr = PurchaseRequest::with(['items', 'requester', 'approver', 'department', 'category', 'statusHistory'])->find($id);
+            $pr = PurchaseRequest::with(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])->find($id);
 
             if (!$pr) {
                 return response()->json([
@@ -229,6 +239,16 @@ class PurchaseRequestController extends Controller
                 }
 
                 $newStatus = $pr->status;
+                if ($newStatus !== $oldStatus) {
+                    PurchaseRequestStatusHistory::create([
+                        'purchase_request_id' => $pr->id,
+                        'from_status' => $oldStatus,
+                        'to_status' => $newStatus,
+                        'changed_by' => $request->user()?->id ?? $pr->requested_by,
+                        'remarks' => $request->input('remarks', "Status updated to {$newStatus}"),
+                    ]);
+                }
+
                 if (in_array($newStatus, ['Released', 'Received', 'Completed']) && !in_array($oldStatus, ['Released', 'Received', 'Completed'])) {
                     if ($pr->department_id) {
                         $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
@@ -239,6 +259,17 @@ class PurchaseRequestController extends Controller
                         if ($budget) {
                             $budget->decrement('reserved_amount', $pr->total_estimated_cost);
                             $budget->increment('spent_amount', $pr->total_estimated_cost);
+
+                            if ($pr->category_id) {
+                                $catBudget = DepartmentCategoryBudget::where('department_budget_id', $budget->id)
+                                    ->where('category_id', $pr->category_id)
+                                    ->lockForUpdate()
+                                    ->first();
+                                if ($catBudget) {
+                                    $catBudget->decrement('reserved_amount', $pr->total_estimated_cost);
+                                    $catBudget->increment('spent_amount', $pr->total_estimated_cost);
+                                }
+                            }
                         }
                     }
                 }
@@ -246,7 +277,7 @@ class PurchaseRequestController extends Controller
 
             return response()->json([
                 'message' => 'Purchase request updated successfully.',
-                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'department', 'category'])
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'department', 'category', 'attachments'])
             ], 200);
         } catch (ValidationException $e) {
             throw $e;
@@ -315,6 +346,115 @@ class PurchaseRequestController extends Controller
             return response()->json([
                 'message' => 'An unexpected error occurred. Please try again later.'
             ], 500);
+        }
+    }
+
+    public function uploadAttachments(Request $request, $id)
+    {
+        try {
+            $pr = PurchaseRequest::find($id);
+            if (!$pr) {
+                return response()->json(['message' => 'Purchase request not found.'], 404);
+            }
+
+            $request->validate([
+                'files' => 'required|array',
+                'files.*' => 'required|file|max:10240',
+            ]);
+
+            $user = $request->user();
+            $uploadedAttachments = [];
+
+            foreach ($request->file('files') as $file) {
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs('purchase-requests/' . $pr->id, $fileName, 'local');
+
+                $attachment = $pr->attachments()->create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $filePath,
+                    'file_size' => $file->getSize(),
+                    'file_type' => $file->getClientMimeType() ?? 'application/octet-stream',
+                    'uploaded_by' => $user->id,
+                    'created_at' => now(),
+                ]);
+
+                $uploadedAttachments[] = $attachment;
+            }
+
+            return response()->json([
+                'message' => 'Attachments uploaded successfully.',
+                'attachments' => $uploadedAttachments,
+                'purchase_request' => $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])
+            ], 201);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Upload attachment failure: ' . $e->getMessage(), [
+                'pr_id' => $id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'An unexpected error occurred while uploading attachments.'
+            ], 500);
+        }
+    }
+
+    public function downloadAttachment(Request $request, $prId, $attachmentId)
+    {
+        try {
+            $attachment = \App\Models\PurchaseRequestAttachment::where('purchase_request_id', $prId)
+                ->where('id', $attachmentId)
+                ->first();
+
+            if (!$attachment || !\Illuminate\Support\Facades\Storage::disk('local')->exists($attachment->file_path)) {
+                return response()->json(['message' => 'Attachment file not found.'], 404);
+            }
+
+            $absolutePath = \Illuminate\Support\Facades\Storage::disk('local')->path($attachment->file_path);
+            return response()->download(
+                $absolutePath,
+                $attachment->file_name,
+                ['Content-Type' => $attachment->file_type]
+            );
+        } catch (\Throwable $e) {
+            Log::error('Download attachment failure: ' . $e->getMessage(), [
+                'pr_id' => $prId,
+                'attachment_id' => $attachmentId,
+            ]);
+            return response()->json(['message' => 'Failed to download attachment.'], 500);
+        }
+    }
+
+    public function deleteAttachment(Request $request, $prId, $attachmentId)
+    {
+        try {
+            $attachment = \App\Models\PurchaseRequestAttachment::where('purchase_request_id', $prId)
+                ->where('id', $attachmentId)
+                ->first();
+
+            if (!$attachment) {
+                return response()->json(['message' => 'Attachment not found.'], 404);
+            }
+
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists($attachment->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($attachment->file_path);
+            }
+
+            $attachment->delete();
+
+            $pr = PurchaseRequest::find($prId);
+
+            return response()->json([
+                'message' => 'Attachment deleted successfully.',
+                'purchase_request' => $pr ? $pr->fresh()->load(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments']) : null
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Delete attachment failure: ' . $e->getMessage(), [
+                'pr_id' => $prId,
+                'attachment_id' => $attachmentId,
+            ]);
+            return response()->json(['message' => 'Failed to delete attachment.'], 500);
         }
     }
 

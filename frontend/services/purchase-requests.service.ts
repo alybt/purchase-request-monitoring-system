@@ -19,13 +19,44 @@ export interface LineItem {
   vendor?: string;
 }
 
+export interface Attachment {
+  id: number;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_by?: number;
+  uploader?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  created_at?: string;
+  download_url?: string;
+}
+
+export interface StatusHistoryItem {
+  id?: number;
+  purchase_request_id?: number;
+  from_status?: string | null;
+  to_status: string;
+  changed_by?: number;
+  changer?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  remarks?: string | null;
+  created_at?: string;
+}
+
 export interface PRData {
   id: string;
   prNumber: string;
   department: string;
   category?: string;
+  categoryId?: number;
   amount: number;
-  status: string;
+  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed" | "pending" | string;
   requestedBy: string;
   dateRequested: string;
   dueDate: string;
@@ -33,7 +64,8 @@ export interface PRData {
   remarks?: string;
   notes?: string;
   lineItems?: LineItem[];
-  statusHistory?: any[];
+  statusHistory?: StatusHistoryItem[];
+  attachments?: Attachment[];
 }
 
 export function mapBackendPRToFrontend(pr: any): PRData {
@@ -57,6 +89,7 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     prNumber: pr.pr_number,
     department: departmentName,
     category: pr.category?.name || "",
+    categoryId: pr.category_id || pr.category?.id,
     amount: parseFloat(pr.total_estimated_cost) || 0,
     status,
     requestedBy: requesterName,
@@ -67,6 +100,7 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     notes: pr.remarks || pr.notes || "",
     lineItems: pr.items || pr.line_items || pr.purchase_request_items || [],
     statusHistory: pr.status_history || pr.statusHistory || [],
+    attachments: pr.attachments || [],
   };
 }
 
@@ -105,13 +139,15 @@ export async function getPurchaseRequestDetails(id: string): Promise<PRData> {
   return mapBackendPRToFrontend(data.purchase_request);
 }
 
-export async function createPurchaseRequest(data: { description: string; amount: number }): Promise<PRData> {
+export async function createPurchaseRequest(data: { description: string; amount: number; category_id?: number; lineItems?: LineItem[] }): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({
       purpose_of_requests: data.description,
-      line_items: [
+      purpose: data.description,
+      category_id: data.category_id || null,
+      line_items: data.lineItems && data.lineItems.length > 0 ? data.lineItems : [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
           description: data.description,
@@ -132,14 +168,15 @@ export async function createPurchaseRequest(data: { description: string; amount:
   return mapBackendPRToFrontend(resData.purchase_request);
 }
 
-export async function updatePurchaseRequest(id: string, data: { description: string; amount: number; status?: string }): Promise<PRData> {
+export async function updatePurchaseRequest(id: string, data: { description: string; amount: number; status?: string; category_id?: number; lineItems?: LineItem[] }): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "PUT",
     headers: getHeaders(),
     body: JSON.stringify({
       purpose: data.description,
       status: data.status,
-      line_items: [
+      category_id: data.category_id || null,
+      line_items: data.lineItems && data.lineItems.length > 0 ? data.lineItems : [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
           description: data.description,
@@ -187,27 +224,67 @@ export async function bulkDeletePurchaseRequests(ids: string[]): Promise<void> {
   }
 }
 
-export async function approvePurchaseRequest(id: string, comments?: string): Promise<void> {
-  const response = await fetch(`${API_URL}/purchase-requests/${id}/approve`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ comments: comments || "" }),
+export async function uploadPRAttachments(id: string, files: File[]): Promise<PRData> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files[]", file);
   });
+
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/attachments`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || "Failed to approve purchase request");
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to upload attachments");
   }
+
+  const resData = await response.json();
+  return mapBackendPRToFrontend(resData.purchase_request);
 }
 
-export async function rejectPurchaseRequest(id: string, comments?: string): Promise<void> {
-  const response = await fetch(`${API_URL}/purchase-requests/${id}/reject`, {
-    method: "POST",
+export async function deletePRAttachment(prId: string, attachmentId: number): Promise<PRData> {
+  const response = await fetch(`${API_URL}/purchase-requests/${prId}/attachments/${attachmentId}`, {
+    method: "DELETE",
     headers: getHeaders(),
-    body: JSON.stringify({ comments: comments || "" }),
   });
+
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || "Failed to reject purchase request");
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to delete attachment");
   }
+
+  const resData = await response.json();
+  return mapBackendPRToFrontend(resData.purchase_request);
+}
+
+export async function downloadPRAttachment(prId: string, attachmentId: number, fileName: string): Promise<void> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const response = await fetch(`${API_URL}/purchase-requests/${prId}/attachments/${attachmentId}/download`, {
+    method: "GET",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to download attachment");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
 

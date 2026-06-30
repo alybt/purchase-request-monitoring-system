@@ -75,8 +75,8 @@ frontend/
 ### C. Purchase Request Manager (`/dashboard/purchase-requests`)
 * Lists all requests with full-text search and filters.
 * Support single or bulk deletions.
-* Handles request edits and creation.
-* Opens details modal showcasing approval workflows.
+* Handles request edits and creation with budget category selection (`category_id`) and optional file attachment uploads (`files[]`).
+* Opens details modal showcasing approval workflows, interactive status transition history / audit trail timeline, and supporting file attachments with upload, download, and delete actions.
 
 ### D. User Provisioning Panel (`/dashboard/users`)
 * Lists system accounts. Offers filters based on role, status, and department.

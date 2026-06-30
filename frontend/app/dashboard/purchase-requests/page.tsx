@@ -14,6 +14,7 @@ import {
   bulkDeletePurchaseRequests,
   approvePurchaseRequest,
   rejectPurchaseRequest,
+  uploadPRAttachments,
   PRData,
 } from "@/services/purchase-requests.service";
 
@@ -133,10 +134,16 @@ export default function PurchaseRequestsPage() {
   const handleFormSubmit = async (data: any) => {
     try {
       if (isEditMode && editingPR) {
-        const updated = await updatePurchaseRequest(editingPR.id, data);
+        let updated = await updatePurchaseRequest(editingPR.id, data);
+        if (data.files && data.files.length > 0) {
+          updated = await uploadPRAttachments(editingPR.id, data.files);
+        }
         setPRs(prs.map((pr) => (pr.id === editingPR.id ? updated : pr)));
       } else {
-        const created = await createPurchaseRequest(data);
+        let created = await createPurchaseRequest(data);
+        if (data.files && data.files.length > 0) {
+          created = await uploadPRAttachments(created.id, data.files);
+        }
         setPRs([created, ...prs]);
       }
       setShowFormModal(false);
