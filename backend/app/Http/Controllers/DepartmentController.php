@@ -14,43 +14,49 @@ class DepartmentController extends Controller
     {
         try {
             $currentYear = $request->input('fiscal_year', now()->year);
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
 
             $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
             $totalCompanyBudget = $companyBudget ? floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward) : 0;
 
             $departments = Department::with([
-                'departmentBudgets' => function ($q) use ($currentYear) {
+                'departmentBudgets' => function ($q) use ($currentYear, $month) {
                     $q->where('fiscal_year', $currentYear);
+                    if ($month !== null) {
+                        $q->where('month', $month);
+                    }
                 }
             ])->orderBy('name')->get();
 
             $mapped = $departments->map(function ($dept) use ($currentYear, $totalCompanyBudget) {
                 $hasAllocation = $dept->departmentBudgets->count() > 0;
                 $allocated = floatval($dept->departmentBudgets->sum('allocated_amount'));
-                $reserved  = floatval($dept->departmentBudgets->sum('reserved_amount'));
-                $spent     = floatval($dept->departmentBudgets->sum('spent_amount'));
+                $reserved = floatval($dept->departmentBudgets->sum('reserved_amount'));
+                $spent = floatval($dept->departmentBudgets->sum('spent_amount'));
                 $available = $allocated - $reserved - $spent;
-                $share     = $totalCompanyBudget > 0 ? ($allocated / $totalCompanyBudget) * 100 : 0;
+                $share = $totalCompanyBudget > 0 ? ($allocated / $totalCompanyBudget) * 100 : 0;
 
                 return [
-                    'id'                => $dept->id,
-                    'name'              => $dept->name,
-                    'code'              => $dept->code,
-                    'description'       => $dept->description,
-                    'status'            => $dept->status ?? 'active',
-                    'has_allocation'    => $hasAllocation,
+                    'id' => $dept->id,
+                    'name' => $dept->name,
+                    'code' => $dept->code,
+                    'description' => $dept->description,
+                    'status' => $dept->status ?? 'active',
+                    'has_allocation' => $hasAllocation,
                     'budget_allocation' => $allocated,
-                    'available_budget'  => $available,
-                    'reserved_budget'   => $reserved,
-                    'spent_budget'      => $spent,
-                    'share'             => $share,
-                    'fiscal_year'       => $currentYear,
+                    'available_budget' => $available,
+                    'reserved_budget' => $reserved,
+                    'spent_budget' => $spent,
+                    'share' => $share,
+                    'fiscal_year' => $currentYear,
                 ];
             });
 
             return response()->json([
                 'departments' => $mapped,
-                'total_company_budget' => $totalCompanyBudget
+                'total_company_budget' => $totalCompanyBudget,
+                'fiscal_year' => (int) $currentYear,
+                'month' => $month,
             ], 200);
         } catch (\Throwable $e) {
             Log::error('List departments failure: ' . $e->getMessage(), [
@@ -64,23 +70,23 @@ class DepartmentController extends Controller
     {
         try {
             $request->validate([
-                'name'        => 'required|string|max:255',
-                'code'        => 'required|string|max:20|unique:departments,code',
+                'name' => 'required|string|max:255',
+                'code' => 'required|string|max:20|unique:departments,code',
                 'description' => 'nullable|string',
-                'status'      => 'nullable|string|in:active,inactive',
-                'head_id'     => 'nullable|exists:users,id',
+                'status' => 'nullable|string|in:active,inactive',
+                'head_id' => 'nullable|exists:users,id',
             ]);
 
             $dept = Department::create([
-                'name'        => $request->input('name'),
-                'code'        => strtoupper($request->input('code')),
+                'name' => $request->input('name'),
+                'code' => strtoupper($request->input('code')),
                 'description' => $request->input('description'),
-                'status'      => $request->input('status', 'active'),
-                'head_id'     => $request->input('head_id'),
+                'status' => $request->input('status', 'active'),
+                'head_id' => $request->input('head_id'),
             ]);
 
             return response()->json([
-                'message'    => 'Department created successfully.',
+                'message' => 'Department created successfully.',
                 'department' => $dept,
             ], 201);
         } catch (ValidationException $e) {
@@ -100,17 +106,17 @@ class DepartmentController extends Controller
             }
 
             $request->validate([
-                'name'        => 'sometimes|required|string|max:255',
-                'code'        => 'sometimes|required|string|max:20|unique:departments,code,' . $id,
+                'name' => 'sometimes|required|string|max:255',
+                'code' => 'sometimes|required|string|max:20|unique:departments,code,' . $id,
                 'description' => 'nullable|string',
-                'status'      => 'nullable|string|in:active,inactive',
-                'head_id'     => 'nullable|exists:users,id',
+                'status' => 'nullable|string|in:active,inactive',
+                'head_id' => 'nullable|exists:users,id',
             ]);
 
             $dept->update($request->only(['name', 'code', 'description', 'status', 'head_id']));
 
             return response()->json([
-                'message'    => 'Department updated successfully.',
+                'message' => 'Department updated successfully.',
                 'department' => $dept,
             ], 200);
         } catch (ValidationException $e) {
@@ -135,18 +141,18 @@ class DepartmentController extends Controller
 
             $request->validate([
                 'allocated_amount' => 'required|numeric|min:0',
-                'fiscal_year'      => 'nullable|integer|min:2000|max:2100',
-                'month'            => 'nullable|integer|min:1|max:12',
+                'fiscal_year' => 'nullable|integer|min:2000|max:2100',
+                'month' => 'nullable|integer|min:1|max:12',
             ]);
 
-            $fiscalYear      = $request->input('fiscal_year', now()->year);
-            $month           = $request->input('month', now()->month);
+            $fiscalYear = $request->input('fiscal_year', now()->year);
+            $month = $request->input('month', now()->month);
             $allocatedAmount = $request->input('allocated_amount');
 
             $budget = DepartmentBudget::firstOrNew([
                 'department_id' => $dept->id,
-                'fiscal_year'   => $fiscalYear,
-                'month'         => $month,
+                'fiscal_year' => $fiscalYear,
+                'month' => $month,
             ]);
 
             // Guard: cannot set below already reserved + spent
@@ -160,7 +166,7 @@ class DepartmentController extends Controller
             $budget->allocated_amount = $allocatedAmount;
             if (!$budget->exists) {
                 $budget->reserved_amount = 0;
-                $budget->spent_amount    = 0;
+                $budget->spent_amount = 0;
             }
             $budget->save();
 
@@ -170,16 +176,16 @@ class DepartmentController extends Controller
 
             return response()->json([
                 'message' => 'Budget updated successfully.',
-                'budget'  => [
+                'budget' => [
                     'department_id' => $dept->id,
-                    'department'    => $dept->name,
-                    'code'          => $dept->code,
-                    'fiscal_year'   => (int) $fiscalYear,
-                    'month'         => (int) $month,
-                    'allocated'     => floatval($budget->allocated_amount),
-                    'reserved'      => floatval($budget->reserved_amount),
-                    'spent'         => floatval($budget->spent_amount),
-                    'available'     => $available,
+                    'department' => $dept->name,
+                    'code' => $dept->code,
+                    'fiscal_year' => (int) $fiscalYear,
+                    'month' => (int) $month,
+                    'allocated' => floatval($budget->allocated_amount),
+                    'reserved' => floatval($budget->reserved_amount),
+                    'spent' => floatval($budget->spent_amount),
+                    'available' => $available,
                 ],
             ], 200);
         } catch (ValidationException $e) {
@@ -187,7 +193,7 @@ class DepartmentController extends Controller
         } catch (\Throwable $e) {
             Log::error('Update department budget failure: ' . $e->getMessage(), [
                 'department_id' => $departmentId,
-                'trace'         => $e->getTraceAsString(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'An unexpected error occurred.'], 500);
         }
@@ -215,7 +221,7 @@ class DepartmentController extends Controller
             if (!$companyBudget) {
                 return response()->json(['message' => "Company budget for FY {$fiscalYear} has not been created yet."], 422);
             }
-            
+
             $totalCompanyBudget = floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward);
 
             // 4. Calculate Total Allocated (including those not in payload but existing in DB)
@@ -265,7 +271,7 @@ class DepartmentController extends Controller
                     $budget = new DepartmentBudget();
                     $budget->department_id = $deptId;
                     $budget->fiscal_year = $fiscalYear;
-                    $budget->month = 1; 
+                    $budget->month = 1;
                     $budget->allocated_amount = $amount;
                     $budget->reserved_amount = 0;
                     $budget->spent_amount = 0;
@@ -316,40 +322,40 @@ class DepartmentController extends Controller
                     : $deptBudgets;
 
                 $allocated = floatval($activeBudgets->sum('allocated_amount'));
-                $reserved  = floatval($activeBudgets->sum('reserved_amount'));
-                $spent     = floatval($activeBudgets->sum('spent_amount'));
+                $reserved = floatval($activeBudgets->sum('reserved_amount'));
+                $spent = floatval($activeBudgets->sum('spent_amount'));
 
                 $monthlyBreakdown = [];
                 for ($m = 1; $m <= 12; $m++) {
                     $mBudget = $deptBudgets->firstWhere('month', $m);
                     $allocM = $mBudget ? floatval($mBudget->allocated_amount) : 0.0;
-                    $resM   = $mBudget ? floatval($mBudget->reserved_amount) : 0.0;
-                    $spM    = $mBudget ? floatval($mBudget->spent_amount) : 0.0;
+                    $resM = $mBudget ? floatval($mBudget->reserved_amount) : 0.0;
+                    $spM = $mBudget ? floatval($mBudget->spent_amount) : 0.0;
                     $monthlyBreakdown[] = [
-                        'month'     => $m,
+                        'month' => $m,
                         'allocated' => $allocM,
-                        'reserved'  => $resM,
-                        'spent'     => $spM,
+                        'reserved' => $resM,
+                        'spent' => $spM,
                         'available' => $allocM - $resM - $spM,
                     ];
                 }
 
                 return [
-                    'department_id'     => $dept->id,
-                    'department'        => $dept->name,
-                    'code'              => $dept->code,
-                    'status'            => $dept->status,
-                    'allocated'         => $allocated,
-                    'reserved'          => $reserved,
-                    'spent'             => $spent,
-                    'available'         => $allocated - $reserved - $spent,
+                    'department_id' => $dept->id,
+                    'department' => $dept->name,
+                    'code' => $dept->code,
+                    'status' => $dept->status,
+                    'allocated' => $allocated,
+                    'reserved' => $reserved,
+                    'spent' => $spent,
+                    'available' => $allocated - $reserved - $spent,
                     'monthly_breakdown' => $monthlyBreakdown,
                 ];
             })->values();
 
             $totalAllocated = $departmentSummaries->sum('allocated');
-            $totalReserved  = $departmentSummaries->sum('reserved');
-            $totalSpent     = $departmentSummaries->sum('spent');
+            $totalReserved = $departmentSummaries->sum('reserved');
+            $totalSpent = $departmentSummaries->sum('spent');
             $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
 
             $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
@@ -361,12 +367,12 @@ class DepartmentController extends Controller
             });
 
             return response()->json([
-                'fiscal_year'          => (int) $currentYear,
-                'month'                => $month,
-                'total_allocated'      => $totalAllocated,
-                'total_reserved'       => $totalReserved,
-                'total_spent'          => $totalSpent,
-                'total_available'      => $totalAvailable,
+                'fiscal_year' => (int) $currentYear,
+                'month' => $month,
+                'total_allocated' => $totalAllocated,
+                'total_reserved' => $totalReserved,
+                'total_spent' => $totalSpent,
+                'total_available' => $totalAvailable,
                 'total_company_budget' => $totalCompanyBudget,
                 'department_summaries' => $departmentSummaries,
             ], 200);
@@ -399,13 +405,13 @@ class DepartmentController extends Controller
                 ->whereRaw('(fiscal_year * 12 + month) <= ?', [$endPeriod]);
 
             $allocatedL12 = floatval($last12MonthsQuery->sum('allocated_amount'));
-            $reservedL12  = floatval($last12MonthsQuery->sum('reserved_amount'));
-            $spentL12     = floatval($last12MonthsQuery->sum('spent_amount'));
+            $reservedL12 = floatval($last12MonthsQuery->sum('reserved_amount'));
+            $spentL12 = floatval($last12MonthsQuery->sum('spent_amount'));
 
             $last12 = [
                 'allocated' => $allocatedL12,
-                'reserved'  => $reservedL12,
-                'spent'     => $spentL12,
+                'reserved' => $reservedL12,
+                'spent' => $spentL12,
                 'available' => $allocatedL12 - $reservedL12 - $spentL12,
             ];
 
@@ -414,13 +420,13 @@ class DepartmentController extends Controller
                 ->where('fiscal_year', $year);
 
             $allocatedYr = floatval($yearQuery->sum('allocated_amount'));
-            $reservedYr  = floatval($yearQuery->sum('reserved_amount'));
-            $spentYr     = floatval($yearQuery->sum('spent_amount'));
+            $reservedYr = floatval($yearQuery->sum('reserved_amount'));
+            $spentYr = floatval($yearQuery->sum('spent_amount'));
 
             $forYear = [
                 'allocated' => $allocatedYr,
-                'reserved'  => $reservedYr,
-                'spent'     => $spentYr,
+                'reserved' => $reservedYr,
+                'spent' => $spentYr,
                 'available' => $allocatedYr - $reservedYr - $spentYr,
             ];
 
@@ -428,10 +434,10 @@ class DepartmentController extends Controller
             $quarters = [];
             $quarterRanges = [
                 'q1_standard' => [1, 3],
-                'q1_user'     => [1, 4],  // 1-4
-                'q2_user'     => [4, 6],  // 4-6
-                'q3_user'     => [7, 9],  // 7-9
-                'q4_user'     => [10, 12], // 10-12
+                'q1_user' => [1, 4],  // 1-4
+                'q2_user' => [4, 6],  // 4-6
+                'q3_user' => [7, 9],  // 7-9
+                'q4_user' => [10, 12], // 10-12
             ];
 
             foreach ($quarterRanges as $key => $range) {
@@ -440,31 +446,31 @@ class DepartmentController extends Controller
                     ->whereBetween('month', $range);
 
                 $allocQ = floatval($qQuery->sum('allocated_amount'));
-                $resQ   = floatval($qQuery->sum('reserved_amount'));
-                $spQ    = floatval($qQuery->sum('spent_amount'));
+                $resQ = floatval($qQuery->sum('reserved_amount'));
+                $spQ = floatval($qQuery->sum('spent_amount'));
 
                 $quarters[$key] = [
                     'allocated' => $allocQ,
-                    'reserved'  => $resQ,
-                    'spent'     => $spQ,
+                    'reserved' => $resQ,
+                    'spent' => $spQ,
                     'available' => $allocQ - $resQ - $spQ,
                 ];
             }
 
             return response()->json([
-                'department_id'   => $dept->id,
+                'department_id' => $dept->id,
                 'department_name' => $dept->name,
-                'fiscal_year'     => (int) $year,
-                'calculations'    => [
+                'fiscal_year' => (int) $year,
+                'calculations' => [
                     'last_12_months' => $last12,
-                    'for_year'       => $forYear,
-                    'quarters'       => $quarters,
+                    'for_year' => $forYear,
+                    'quarters' => $quarters,
                 ],
             ], 200);
         } catch (\Throwable $e) {
             Log::error('Get department budget calculations failure: ' . $e->getMessage(), [
                 'department_id' => $departmentId,
-                'trace'         => $e->getTraceAsString(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'An unexpected error occurred.'], 500);
         }
@@ -497,12 +503,12 @@ class DepartmentController extends Controller
     {
         try {
             $request->validate([
-                'ids'   => 'required|array',
+                'ids' => 'required|array',
                 'ids.*' => 'integer|exists:departments,id',
             ]);
 
             $ids = $request->input('ids');
-            
+
             // Check for relations before bulk deleting
             $departments = Department::whereIn('id', $ids)->get();
             $undeletable = [];
@@ -543,7 +549,7 @@ class DepartmentController extends Controller
 
             $query = DepartmentBudget::where('department_id', $id)
                 ->where('fiscal_year', $fiscalYear);
-            
+
             if ($month) {
                 $query->where('month', $month);
             }
@@ -572,7 +578,7 @@ class DepartmentController extends Controller
     {
         try {
             $request->validate([
-                'ids'   => 'required|array',
+                'ids' => 'required|array',
                 'ids.*' => 'integer|exists:departments,id',
                 'fiscal_year' => 'required|integer',
                 'month' => 'nullable|integer',
@@ -584,7 +590,7 @@ class DepartmentController extends Controller
 
             $query = DepartmentBudget::whereIn('department_id', $ids)
                 ->where('fiscal_year', $fiscalYear);
-            
+
             if ($month) {
                 $query->where('month', $month);
             }
