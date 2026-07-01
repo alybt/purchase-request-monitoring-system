@@ -19,41 +19,47 @@ class DashboardTest extends TestCase
     {
         parent::setUp();
 
+        $itDept = \App\Models\Department::create(['name' => 'IT', 'code' => 'IT']);
+        $hrDept = \App\Models\Department::create(['name' => 'HR', 'code' => 'HR']);
+        $opsDept = \App\Models\Department::create(['name' => 'Operations', 'code' => 'OPS']);
+
         $this->admin = User::factory()->create([
             'role' => 'admin',
             'status' => 'active',
-            'department' => 'IT',
+            'department_id' => $itDept->id,
         ]);
 
         $this->employee1 = User::factory()->create([
-            'role' => 'employee',
+            'role' => 'department_head',
             'status' => 'active',
-            'department' => 'HR',
+            'department_id' => $hrDept->id,
         ]);
 
         $this->employee2 = User::factory()->create([
-            'role' => 'employee',
+            'role' => 'department_head',
             'status' => 'suspended',
-            'department' => 'Operations',
+            'department_id' => $opsDept->id,
         ]);
 
         // Create a PR approved this month
         $pr1 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-001',
-            'user_id' => $this->employee1->id,
-            'purpose_of_requests' => 'HR Office Supplies',
-            'status' => 'Approve',
+            'requested_by' => $this->employee1->id,
+            'department_id' => $hrDept->id,
+            'purpose' => 'HR Office Supplies',
+            'status' => 'Approved',
             'total_estimated_cost' => 500.00,
         ]);
         $pr1->created_at = now();
         $pr1->save();
 
-        // Create a bottleneck PR (status Request, created > 48 hours ago)
+        // Create a bottleneck PR (status Submitted, created > 48 hours ago)
         $pr2 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-002',
-            'user_id' => $this->employee1->id,
-            'purpose_of_requests' => 'Laptops',
-            'status' => 'Request',
+            'requested_by' => $this->employee1->id,
+            'department_id' => $hrDept->id,
+            'purpose' => 'Laptops',
+            'status' => 'Submitted',
             'total_estimated_cost' => 2000.00,
         ]);
         $pr2->created_at = now()->subDays(3);
@@ -62,9 +68,10 @@ class DashboardTest extends TestCase
         // Create a regular request PR (created recently)
         $pr3 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-003',
-            'user_id' => $this->employee2->id,
-            'purpose_of_requests' => 'Operations tools',
-            'status' => 'Request',
+            'requested_by' => $this->employee2->id,
+            'department_id' => $opsDept->id,
+            'purpose' => 'Operations tools',
+            'status' => 'Submitted',
             'total_estimated_cost' => 150.00,
         ]);
         $pr3->created_at = now();
@@ -118,10 +125,10 @@ class DashboardTest extends TestCase
                 '*' => [
                     'id',
                     'pr_number',
-                    'purpose_of_requests',
+                    'purpose',
                     'status',
                     'total_estimated_cost',
-                    'user',
+                    'requester',
                 ]
             ]
         ]);
@@ -144,15 +151,15 @@ class DashboardTest extends TestCase
                     'id',
                     'pr_number',
                     'status',
-                    'user',
+                    'requester',
                 ]
             ]
         ]);
 
-        // Only PRs with status = 'Request' should be returned (PR-2026-002 and PR-2026-003)
+        // Only PRs with status = 'Submitted' should be returned (PR-2026-002 and PR-2026-003)
         $response->assertJsonCount(2, 'pending_approvals');
         $response->assertJsonFragment(['pr_number' => 'PR-2026-002']);
         $response->assertJsonFragment(['pr_number' => 'PR-2026-003']);
-        $response->assertJsonMissingExact(['pr_number' => 'PR-2026-001']); // status Approve
+        $response->assertJsonMissingExact(['pr_number' => 'PR-2026-001']); // status Approved
     }
 }

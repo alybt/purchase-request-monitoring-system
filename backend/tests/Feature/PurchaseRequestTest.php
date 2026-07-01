@@ -24,22 +24,27 @@ class PurchaseRequestTest extends TestCase
     {
         parent::setUp();
 
+        $itDept = \App\Models\Department::create(['name' => 'IT', 'code' => 'IT']);
+        $finDept = \App\Models\Department::create(['name' => 'Finance', 'code' => 'FIN']);
+        $hrDept = \App\Models\Department::create(['name' => 'HR', 'code' => 'HR']);
+        $opsDept = \App\Models\Department::create(['name' => 'Operations', 'code' => 'OPS']);
+
         $this->admin = User::factory()->create([
             'role' => 'admin',
             'status' => 'active',
-            'department' => 'IT',
+            'department_id' => $itDept->id,
         ]);
 
         $this->approver = User::factory()->create([
-            'role' => 'approver',
+            'role' => 'department_head',
             'status' => 'active',
-            'department' => 'Finance',
+            'department_id' => $finDept->id,
         ]);
 
         $this->employee1 = User::factory()->create([
             'role' => 'employee',
             'status' => 'active',
-            'department' => 'HR',
+            'department_id' => $hrDept->id,
             'first_name' => 'Alice',
             'last_name' => 'Smith',
         ]);
@@ -47,16 +52,17 @@ class PurchaseRequestTest extends TestCase
         $this->employee2 = User::factory()->create([
             'role' => 'employee',
             'status' => 'active',
-            'department' => 'Operations',
+            'department_id' => $opsDept->id,
             'first_name' => 'Bob',
             'last_name' => 'Jones',
         ]);
 
         $this->pr1 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-001',
-            'user_id' => $this->employee1->id,
-            'purpose_of_requests' => 'Office Supply Upgrades',
-            'status' => 'Request',
+            'requested_by' => $this->employee1->id,
+            'department_id' => $hrDept->id,
+            'purpose' => 'Office Supply Upgrades',
+            'status' => 'Submitted',
             'total_estimated_cost' => 100.00,
         ]);
 
@@ -69,9 +75,10 @@ class PurchaseRequestTest extends TestCase
 
         $this->pr2 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-002',
-            'user_id' => $this->employee2->id,
-            'purpose_of_requests' => 'Server Equipment',
-            'status' => 'Approve',
+            'requested_by' => $this->employee2->id,
+            'department_id' => $opsDept->id,
+            'purpose' => 'Server Equipment',
+            'status' => 'Approved',
             'total_estimated_cost' => 1200.00,
         ]);
 
@@ -93,7 +100,7 @@ class PurchaseRequestTest extends TestCase
 
     public function test_list_purchase_requests_filter_by_status(): void
     {
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/purchase-requests?status=Approve');
+        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/purchase-requests?status=Approved');
 
         $response->assertStatus(200);
         $response->assertJsonCount(1, 'purchase_requests');
@@ -157,10 +164,10 @@ class PurchaseRequestTest extends TestCase
             'purchase_request' => [
                 'id',
                 'pr_number',
-                'purpose_of_requests',
+                'purpose',
                 'status',
                 'total_estimated_cost',
-                'line_items' => [
+                'items' => [
                     '*' => [
                         'id',
                         'item_name',
@@ -173,17 +180,17 @@ class PurchaseRequestTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('purchase_requests', [
-            'purpose_of_requests' => 'New Projector',
+            'purpose' => 'New Projector',
             'total_estimated_cost' => 700.00,
-            'status' => 'Request',
+            'status' => 'Draft',
         ]);
 
-        $this->assertDatabaseHas('pr_line_items', [
+        $this->assertDatabaseHas('purchase_request_items', [
             'item_name' => 'Epson Projector',
             'total_price' => 500.00,
         ]);
 
-        $this->assertDatabaseHas('pr_line_items', [
+        $this->assertDatabaseHas('purchase_request_items', [
             'item_name' => 'Projector Screen',
             'total_price' => 200.00,
         ]);
@@ -195,7 +202,7 @@ class PurchaseRequestTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('purchase_request.pr_number', 'PR-2026-001');
-        $response->assertJsonCount(1, 'purchase_request.line_items');
+        $response->assertJsonCount(1, 'purchase_request.items');
     }
 
     public function test_update_purchase_request(): void
@@ -218,26 +225,26 @@ class PurchaseRequestTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonPath('purchase_request.total_estimated_cost', 125);
+        $response->assertJsonPath('purchase_request.total_estimated_cost', '125.00');
 
         $this->assertDatabaseHas('purchase_requests', [
             'id' => $this->pr1->id,
-            'purpose_of_requests' => 'Updated Office Supplies',
+            'purpose' => 'Updated Office Supplies',
             'status' => 'Released',
             'total_estimated_cost' => 125.00,
         ]);
 
         // Old line items should be deleted
-        $this->assertDatabaseMissing('pr_line_items', [
+        $this->assertDatabaseMissing('purchase_request_items', [
             'item_name' => 'Notebooks',
         ]);
 
         // New line items should be created
-        $this->assertDatabaseHas('pr_line_items', [
+        $this->assertDatabaseHas('purchase_request_items', [
             'item_name' => 'Notebooks Premium',
             'total_price' => 100.00,
         ]);
-        $this->assertDatabaseHas('pr_line_items', [
+        $this->assertDatabaseHas('purchase_request_items', [
             'item_name' => 'Pens',
             'total_price' => 25.00,
         ]);
@@ -249,7 +256,7 @@ class PurchaseRequestTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertDatabaseMissing('purchase_requests', ['id' => $this->pr1->id]);
-        $this->assertDatabaseMissing('pr_line_items', ['pr_id' => $this->pr1->id]);
+        $this->assertDatabaseMissing('purchase_request_items', ['purchase_request_id' => $this->pr1->id]);
     }
 
     public function test_bulk_delete_purchase_requests(): void
@@ -266,43 +273,64 @@ class PurchaseRequestTest extends TestCase
     public function test_approve_purchase_request(): void
     {
         $response = $this->actingAs($this->approver, 'sanctum')->postJson('/api/purchase-requests/' . $this->pr1->id . '/approve', [
-            'comments' => 'Looks good, approved budget.',
+            'remarks' => 'Looks good, approved budget.',
         ]);
 
         $response->assertStatus(200);
         $this->assertDatabaseHas('purchase_requests', [
             'id' => $this->pr1->id,
-            'status' => 'Approve',
+            'status' => 'Approved',
         ]);
 
-        $this->assertDatabaseHas('approval_form', [
-            'pr_id' => $this->pr1->id,
-            'approver_id' => $this->approver->id,
-            'status' => 'Approve',
-            'comments' => 'Looks good, approved budget.',
+        $this->assertDatabaseHas('purchase_request_status_history', [
+            'purchase_request_id' => $this->pr1->id,
+            'changed_by' => $this->approver->id,
+            'to_status' => 'Approved',
+            'remarks' => 'Looks good, approved budget.',
         ]);
     }
 
     public function test_reject_purchase_request(): void
     {
         $response = $this->actingAs($this->approver, 'sanctum')->postJson('/api/purchase-requests/' . $this->pr1->id . '/reject', [
-            'comments' => 'Too expensive, reject.',
+            'remarks' => 'Too expensive, reject.',
         ]);
 
         $response->assertStatus(200);
         
-        // Status should be unchanged/not modified on PR (remains Request)
         $this->assertDatabaseHas('purchase_requests', [
             'id' => $this->pr1->id,
-            'status' => 'Request',
+            'status' => 'Rejected',
         ]);
 
-        // Rejection should be recorded in approval form
-        $this->assertDatabaseHas('approval_form', [
-            'pr_id' => $this->pr1->id,
-            'approver_id' => $this->approver->id,
-            'status' => 'Reject',
-            'comments' => 'Too expensive, reject.',
+        $this->assertDatabaseHas('purchase_request_status_history', [
+            'purchase_request_id' => $this->pr1->id,
+            'changed_by' => $this->approver->id,
+            'to_status' => 'Rejected',
+            'remarks' => 'Too expensive, reject.',
         ]);
+    }
+
+    public function test_purchase_request_attachments_crud(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $file = \Illuminate\Http\UploadedFile::fake()->create('quote.pdf', 500, 'application/pdf');
+
+        // Upload
+        $response = $this->actingAs($this->employee1, 'sanctum')->postJson("/api/purchase-requests/{$this->pr1->id}/attachments", [
+            'files' => [$file]
+        ]);
+        $response->assertStatus(201);
+        $attachmentId = $response->json('attachments.0.id');
+        $this->assertNotNull($attachmentId);
+
+        // Download
+        $dlResponse = $this->actingAs($this->employee1, 'sanctum')->get("/api/purchase-requests/{$this->pr1->id}/attachments/{$attachmentId}/download");
+        $dlResponse->assertStatus(200);
+
+        // Delete
+        $delResponse = $this->actingAs($this->employee1, 'sanctum')->deleteJson("/api/purchase-requests/{$this->pr1->id}/attachments/{$attachmentId}");
+        $delResponse->assertStatus(200);
+        $this->assertDatabaseMissing('purchase_request_attachments', ['id' => $attachmentId]);
     }
 }

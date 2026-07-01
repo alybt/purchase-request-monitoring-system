@@ -18,6 +18,10 @@ class UserTest extends TestCase
     {
         parent::setUp();
 
+        $itDept = \App\Models\Department::create(['name' => 'IT', 'code' => 'IT']);
+        $hrDept = \App\Models\Department::create(['name' => 'HR', 'code' => 'HR']);
+        $finDept = \App\Models\Department::create(['name' => 'Finance', 'code' => 'FIN']);
+
         // Seed users for testing
         $this->admin = User::factory()->create([
             'first_name' => 'Admin',
@@ -26,7 +30,7 @@ class UserTest extends TestCase
             'email' => 'admin@example.com',
             'role' => 'admin',
             'status' => 'active',
-            'department' => 'IT',
+            'department_id' => $itDept->id,
         ]);
 
         $this->employee1 = User::factory()->create([
@@ -34,9 +38,9 @@ class UserTest extends TestCase
             'middle_name' => 'M',
             'last_name' => 'Doe',
             'email' => 'john.doe@example.com',
-            'role' => 'employee',
+            'role' => 'department_head',
             'status' => 'active',
-            'department' => 'HR',
+            'department_id' => $hrDept->id,
         ]);
 
         $this->employee2 = User::factory()->create([
@@ -44,9 +48,9 @@ class UserTest extends TestCase
             'middle_name' => null,
             'last_name' => 'Smith',
             'email' => 'jane.smith@example.com',
-            'role' => 'approver',
+            'role' => 'department_head',
             'status' => 'suspended',
-            'department' => 'Finance',
+            'department_id' => $finDept->id,
         ]);
     }
 
@@ -104,10 +108,9 @@ class UserTest extends TestCase
     public function test_list_users_with_filters(): void
     {
         // Filter by role
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/users?role=approver');
+        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/users?role=department_head');
         $response->assertStatus(200);
-        $response->assertJsonCount(1, 'users');
-        $response->assertJsonFragment(['email' => 'jane.smith@example.com']);
+        $response->assertJsonCount(2, 'users');
 
         // Filter by status
         $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/users?status=suspended');
@@ -124,11 +127,14 @@ class UserTest extends TestCase
 
     public function test_create_user_successfully(): void
     {
+        $ops = \App\Models\Department::create(['name' => 'Operations', 'code' => 'OPS']);
+
         $response = $this->actingAs($this->admin, 'sanctum')->postJson('/api/users', [
             'first_name' => 'Alice',
             'last_name' => 'Jones',
             'email' => 'alice.jones@example.com',
-            'password' => 'supersecretpassword123',
+            'password' => 'SuperSecret123',
+            'password_confirmation' => 'SuperSecret123',
             'role' => 'employee',
             'status' => 'active',
             'department' => 'Operations',
@@ -144,7 +150,7 @@ class UserTest extends TestCase
                 'email',
                 'role',
                 'status',
-                'department',
+                'department_id',
             ]
         ]);
 
@@ -152,6 +158,7 @@ class UserTest extends TestCase
             'email' => 'alice.jones@example.com',
             'first_name' => 'Alice',
             'last_name' => 'Jones',
+            'department_id' => $ops->id,
         ]);
     }
 
@@ -185,6 +192,8 @@ class UserTest extends TestCase
 
     public function test_update_user(): void
     {
+        $mkt = \App\Models\Department::create(['name' => 'Marketing', 'code' => 'MKT']);
+
         $response = $this->actingAs($this->admin, 'sanctum')->putJson('/api/users/' . $this->employee1->id, [
             'first_name' => 'Johnny',
             'last_name' => 'Doe Updated',
@@ -203,6 +212,7 @@ class UserTest extends TestCase
             'first_name' => 'Johnny',
             'last_name' => 'Doe Updated',
             'email' => 'johnny.updated@example.com',
+            'department_id' => $mkt->id,
         ]);
     }
 
