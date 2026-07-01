@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property float|string|int $allocated_amount
+ * @property float|string|int $reserved_amount
+ * @property float|string|int $spent_amount
+ */
 #[Fillable(['department_budget_id', 'category_id', 'allocated_amount', 'reserved_amount', 'spent_amount'])]
 class DepartmentCategoryBudget extends Model
 {
