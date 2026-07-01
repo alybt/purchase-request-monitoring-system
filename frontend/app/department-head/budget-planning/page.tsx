@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
-import { getMyDepartmentBudget } from "@/services/budget.service";
-import { getCategories } from "@/services/budget.service";
+import { getMyDepartmentBudget, getCategories } from "@/services/budget.service";
 import type { DepartmentBudget, CategoryBudget, Category } from "@/services/budget.service";
+import { AllocateCategoryBudgetModal } from "@/features/categories/components/AllocateCategoryBudgetModal";
 
 const icons = {
   budget: (
@@ -25,13 +25,15 @@ const icons = {
   ),
 };
 
-export default function CategoryBudgetPlanningPage() {
+export default function CategoryBudgetPage() {
   const [budget, setBudget] = useState<DepartmentBudget | null>(null);
   const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
 
-  useEffect(() => {
+  const fetchData = () => {
+    setLoading(true);
     Promise.all([
       getMyDepartmentBudget().catch(() => ({ department_budget: null, category_budgets: [] })),
       getCategories().catch(() => [] as Category[]),
@@ -40,21 +42,32 @@ export default function CategoryBudgetPlanningPage() {
       setCategoryBudgets(budgetData.category_budgets);
       setAllCategories(cats);
     }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const totalAllocatedToCategories = categoryBudgets.reduce((sum, c) => sum + c.allocated, 0);
   const remainingToAllocate = budget ? budget.allocated - totalAllocatedToCategories : 0;
 
-  // Filter out already-allocated categories from the "add" dropdown
-  const allocatedCategoryIds = new Set(categoryBudgets.map((c) => c.category_id));
-  const unallocatedCategories = allCategories.filter((c) => !allocatedCategoryIds.has(c.id));
-
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
-        title="Category Budget Planning"
-        subtitle="View your department budget allocations across categories"
-        breadcrumbs={[{ label: "Department Head" }, { label: "Category Budget Planning" }]}
+        title="Category Budget"
+        subtitle="View and manage your department's category budget allocations"
+        breadcrumbs={[{ label: "Department Head" }, { label: "Category Budget" }]}
+        actions={
+          <button
+            onClick={() => setShowAllocateModal(true)}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Allocate Category Budget
+          </button>
+        }
       />
 
       {loading ? (
@@ -146,11 +159,52 @@ export default function CategoryBudgetPlanningPage() {
             </div>
           </div>
 
-          {/* Info box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
-            <strong>Note:</strong> Category budget allocations are managed by the administrator. Contact your admin to adjust budget allocations for your department.
-          </div>
+          {/* Budget Utilization Chart */}
+          {categoryBudgets.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-base font-bold text-secondary mb-4">Budget Utilization by Category</h3>
+              <div className="space-y-4">
+                {categoryBudgets.map((cat) => {
+                  const utilization = cat.allocated > 0
+                    ? ((cat.reserved + cat.spent) / cat.allocated) * 100
+                    : 0;
+                  return (
+                    <div key={cat.id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-secondary">{cat.category}</span>
+                        <span className="text-sm text-secondary/60">{utilization.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${Math.min(utilization, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1 text-xs text-secondary/50">
+                        <span>₱{cat.allocated.toLocaleString()} allocated</span>
+                        <span>₱{cat.available.toLocaleString()} available</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
+      )}
+
+      {showAllocateModal && (
+        <AllocateCategoryBudgetModal
+          isOpen={showAllocateModal}
+          departmentBudget={budget}
+          categories={allCategories}
+          existingAllocations={categoryBudgets}
+          onClose={() => setShowAllocateModal(false)}
+          onSaved={() => {
+            setShowAllocateModal(false);
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

@@ -10,10 +10,13 @@ use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $currentYear = now()->year;
+            $currentYear = $request->input('fiscal_year', now()->year);
+
+            $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
+            $totalCompanyBudget = $companyBudget ? floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward) : 0;
 
             $departments = Department::with([
                 'departmentBudgets' => function ($q) use ($currentYear) {
@@ -21,26 +24,34 @@ class DepartmentController extends Controller
                 }
             ])->orderBy('name')->get();
 
-            $mapped = $departments->map(function ($dept) use ($currentYear) {
+            $mapped = $departments->map(function ($dept) use ($currentYear, $totalCompanyBudget) {
+                $hasAllocation = $dept->departmentBudgets->count() > 0;
                 $allocated = floatval($dept->departmentBudgets->sum('allocated_amount'));
                 $reserved  = floatval($dept->departmentBudgets->sum('reserved_amount'));
                 $spent     = floatval($dept->departmentBudgets->sum('spent_amount'));
                 $available = $allocated - $reserved - $spent;
+                $share     = $totalCompanyBudget > 0 ? ($allocated / $totalCompanyBudget) * 100 : 0;
 
                 return [
                     'id'                => $dept->id,
                     'name'              => $dept->name,
                     'code'              => $dept->code,
                     'description'       => $dept->description,
+                    'status'            => $dept->status ?? 'active',
+                    'has_allocation'    => $hasAllocation,
                     'budget_allocation' => $allocated,
                     'available_budget'  => $available,
                     'reserved_budget'   => $reserved,
                     'spent_budget'      => $spent,
+                    'share'             => $share,
                     'fiscal_year'       => $currentYear,
                 ];
             });
 
-            return response()->json(['departments' => $mapped], 200);
+            return response()->json([
+                'departments' => $mapped,
+                'total_company_budget' => $totalCompanyBudget
+            ], 200);
         } catch (\Throwable $e) {
             Log::error('List departments failure: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -56,12 +67,16 @@ class DepartmentController extends Controller
                 'name'        => 'required|string|max:255',
                 'code'        => 'required|string|max:20|unique:departments,code',
                 'description' => 'nullable|string',
+                'status'      => 'nullable|string|in:active,inactive',
+                'head_id'     => 'nullable|exists:users,id',
             ]);
 
             $dept = Department::create([
                 'name'        => $request->input('name'),
                 'code'        => strtoupper($request->input('code')),
                 'description' => $request->input('description'),
+                'status'      => $request->input('status', 'active'),
+                'head_id'     => $request->input('head_id'),
             ]);
 
             return response()->json([
@@ -88,9 +103,11 @@ class DepartmentController extends Controller
                 'name'        => 'sometimes|required|string|max:255',
                 'code'        => 'sometimes|required|string|max:20|unique:departments,code,' . $id,
                 'description' => 'nullable|string',
+                'status'      => 'nullable|string|in:active,inactive',
+                'head_id'     => 'nullable|exists:users,id',
             ]);
 
-            $dept->update($request->only(['name', 'code', 'description']));
+            $dept->update($request->only(['name', 'code', 'description', 'status', 'head_id']));
 
             return response()->json([
                 'message'    => 'Department updated successfully.',
@@ -177,6 +194,106 @@ class DepartmentController extends Controller
     }
 
     /**
+     * Bulk allocate budget for multiple departments for a given fiscal year.
+     */
+    public function bulkAllocateBudget(Request $request)
+    {
+        try {
+            // 2 & 3: Validate allocation values are numeric and not negative
+            $request->validate([
+                'fiscal_year' => 'required|integer',
+                'allocations' => 'required|array',
+                'allocations.*.department_id' => 'required|integer|exists:departments,id',
+                'allocations.*.allocated_amount' => 'required|numeric|min:0',
+            ]);
+
+            $fiscalYear = $request->input('fiscal_year');
+            $allocations = $request->input('allocations');
+
+            // 1. Validate Company Budget exists
+            $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $fiscalYear)->first();
+            if (!$companyBudget) {
+                return response()->json(['message' => "Company budget for FY {$fiscalYear} has not been created yet."], 422);
+            }
+            
+            $totalCompanyBudget = floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward);
+
+            // 4. Calculate Total Allocated (including those not in payload but existing in DB)
+            $requestedTotal = array_reduce($allocations, function ($carry, $item) {
+                return $carry + floatval($item['allocated_amount']);
+            }, 0);
+
+            $departmentIdsInPayload = array_column($allocations, 'department_id');
+            $otherAllocationsTotal = DepartmentBudget::where('fiscal_year', $fiscalYear)
+                ->whereNotIn('department_id', $departmentIdsInPayload)
+                ->sum('allocated_amount');
+
+            $totalAllocated = $requestedTotal + floatval($otherAllocationsTotal);
+
+            // 5. If Total Allocated > Company Budget, reject the request with a validation error
+            if ($totalAllocated > $totalCompanyBudget) {
+                return response()->json([
+                    'message' => 'Total department allocations cannot exceed the Company Budget limit.'
+                ], 422);
+            }
+
+            \DB::beginTransaction();
+
+            $updatedCount = 0;
+            // 6. Save the exact allocation values received from the client
+            foreach ($allocations as $alloc) {
+                $deptId = $alloc['department_id'];
+                $amount = floatval($alloc['allocated_amount']);
+
+                $existingRecords = DepartmentBudget::where('department_id', $deptId)
+                    ->where('fiscal_year', $fiscalYear)
+                    ->get();
+
+                if ($existingRecords->count() > 0) {
+                    // Update the first record with the full amount
+                    $firstRecord = $existingRecords->first();
+                    $firstRecord->allocated_amount = $amount;
+                    $firstRecord->save();
+
+                    // Zero out any other existing monthly records for this FY to prevent massive inflated SUMs
+                    foreach ($existingRecords->slice(1) as $extraRecord) {
+                        $extraRecord->allocated_amount = 0;
+                        $extraRecord->save();
+                    }
+                } else {
+                    // Only create if absolutely no records exist for this FY
+                    $budget = new DepartmentBudget();
+                    $budget->department_id = $deptId;
+                    $budget->fiscal_year = $fiscalYear;
+                    $budget->month = 1; 
+                    $budget->allocated_amount = $amount;
+                    $budget->reserved_amount = 0;
+                    $budget->spent_amount = 0;
+                    $budget->save();
+                }
+                $updatedCount++;
+            }
+
+            // Sync the company budget's allocated amount tracker to accurately reflect the database
+            $companyBudget->allocated_amount = DepartmentBudget::where('fiscal_year', $fiscalYear)->sum('allocated_amount');
+            $companyBudget->save();
+
+            \DB::commit();
+
+            // 7. Return the saved records (success message)
+            return response()->json([
+                'message' => "Successfully allocated budget to {$updatedCount} departments."
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            Log::error('Bulk allocate budget failure: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
+    /**
      * Get all departments with their budget summary for the admin budget page.
      */
     public function budgetSummary(Request $request)
@@ -221,6 +338,7 @@ class DepartmentController extends Controller
                     'department_id'     => $dept->id,
                     'department'        => $dept->name,
                     'code'              => $dept->code,
+                    'status'            => $dept->status,
                     'allocated'         => $allocated,
                     'reserved'          => $reserved,
                     'spent'             => $spent,
@@ -234,8 +352,11 @@ class DepartmentController extends Controller
             $totalSpent     = $departmentSummaries->sum('spent');
             $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
 
-            $departmentSummaries = $departmentSummaries->map(function ($summary) use ($totalAllocated) {
-                $summary['percentage'] = $totalAllocated > 0 ? round(($summary['allocated'] / $totalAllocated) * 100, 1) : 0;
+            $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
+            $totalCompanyBudget = $companyBudget ? (floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward)) : 0;
+
+            $departmentSummaries = $departmentSummaries->map(function ($summary) use ($totalCompanyBudget) {
+                $summary['percentage'] = $totalCompanyBudget > 0 ? round(($summary['allocated'] / $totalCompanyBudget) * 100, 2) : 0;
                 return $summary;
             });
 
@@ -246,6 +367,7 @@ class DepartmentController extends Controller
                 'total_reserved'       => $totalReserved,
                 'total_spent'          => $totalSpent,
                 'total_available'      => $totalAvailable,
+                'total_company_budget' => $totalCompanyBudget,
                 'department_summaries' => $departmentSummaries,
             ], 200);
         } catch (\Throwable $e) {

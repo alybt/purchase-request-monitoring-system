@@ -85,6 +85,19 @@ export async function getCategoryBudget(categoryId: number): Promise<CategoryBud
   return data.category_budget ?? null;
 }
 
+export async function bulkAllocateCategoryBudget(fiscalYear: number, allocations: { category_id: number; allocated_amount: number }[]): Promise<void> {
+  const response = await fetch(`${API_URL}/budget/category/allocate`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ fiscal_year: fiscalYear, allocations }),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to allocate category budgets");
+  }
+}
+
 export interface MonthlyBreakdownItem {
   month: number;
   allocated: number;
@@ -174,6 +187,17 @@ export async function getAllCompanyBudgets(): Promise<CompanyBudget[]> {
   }
   const data = await response.json();
   return data.budgets || [];
+}
+
+export async function getAvailableFiscalYears(): Promise<number[]> {
+  const response = await fetch(`${API_URL}/fiscal-years`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) {
+    return [new Date().getFullYear()];
+  }
+  const data = await response.json().catch(() => ({}));
+  return data.years || [new Date().getFullYear()];
 }
 
 export async function getCompanyBudget(fiscalYear: number): Promise<CompanyBudget | null> {

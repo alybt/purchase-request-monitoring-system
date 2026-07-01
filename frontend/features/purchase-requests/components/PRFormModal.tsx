@@ -304,10 +304,13 @@ export default function PRFormModal({
                 onChange={handleChange}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
               >
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Ordered">Ordered</option>
+                <option value="Received">Received</option>
+                <option value="Released">Released</option>
+                <option value="Completed">Completed</option>
               </select>
             </div>
 
@@ -350,6 +353,37 @@ export default function PRFormModal({
                 </p>
               )}
             </div>
+
+            {/* Line Items (Read-only representation) */}
+            {isEditMode && initialData?.lineItems && initialData.lineItems.length > 0 && (
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <label className="block text-sm font-semibold text-secondary mb-2">
+                  Line Items (Read-Only)
+                </label>
+                <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Item</th>
+                        <th className="px-3 py-2 font-medium">Qty</th>
+                        <th className="px-3 py-2 font-medium">Price</th>
+                        <th className="px-3 py-2 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {initialData.lineItems.map((item: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100 last:border-b-0 text-secondary">
+                          <td className="px-3 py-2 font-medium">{item.item_name}</td>
+                          <td className="px-3 py-2">{item.quantity}</td>
+                          <td className="px-3 py-2">₱{Number(item.unit_price).toLocaleString()}</td>
+                          <td className="px-3 py-2 font-semibold">₱{(item.quantity * item.unit_price).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Buttons */}

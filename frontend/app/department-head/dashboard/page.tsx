@@ -21,14 +21,19 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   ),
-  reserved: (
+  categoryAllocated: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
     </svg>
   ),
-  spent: (
+  categoryRemaining: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  document: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
     </svg>
   ),
   pending: (
@@ -38,7 +43,12 @@ const icons = {
   ),
   approved: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  ),
+  completed: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
     </svg>
   ),
 };
@@ -46,99 +56,128 @@ const icons = {
 export default function DepartmentHeadDashboardPage() {
   const [prs, setPrs] = useState<PRData[]>([]);
   const [budget, setBudget] = useState<DepartmentBudget | null>(null);
+  const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch (e) {}
+      }
+    }
+
     Promise.all([
       getPurchaseRequests().catch(() => [] as PRData[]),
       getMyDepartmentBudget().catch(() => ({ department_budget: null, category_budgets: [] })),
     ]).then(([prData, budgetData]) => {
       setPrs(prData);
       setBudget(budgetData.department_budget);
+      setCategoryBudgets(budgetData.category_budgets);
     }).finally(() => setLoading(false));
   }, []);
 
-  const pendingRequests = prs.filter((pr) => pr.status === "Submitted").length;
-  const approvedRequests = prs.filter((pr) => pr.status === "Approved").length;
+  const totalPrs = prs.length;
+  const pendingRequests = prs.filter((pr) => pr.status === "Pending" || pr.status === "pending").length;
+  const approvedRequests = prs.filter((pr) => pr.status === "Approved" || pr.status === "Ordered" || pr.status === "Received" || pr.status === "Released").length;
+  const completedRequests = prs.filter((pr) => pr.status === "Completed").length;
+
+  const categoryAllocated = categoryBudgets.reduce((sum, c) => sum + c.allocated, 0);
+  const categoryRemaining = (budget?.allocated || 0) - categoryAllocated;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
       <PageHeader
         title="Department Head Dashboard"
         subtitle="Track your department budget and purchase requests"
         breadcrumbs={[{ label: "Department Head" }, { label: "Dashboard" }]}
-        actions={
-          <Link
-            href="/department-head/purchase-requests/create"
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Request
-          </Link>
-        }
       />
 
       {loading ? (
-        <div className="p-8 text-center text-secondary/50">Loading dashboard...</div>
+        <div className="py-12 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <svg className="animate-spin h-8 w-8 text-primary mb-2" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm text-slate-500 font-medium">Loading dashboard...</span>
+        </div>
       ) : (
         <>
-          {/* Budget Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* Context Plain Text */}
+          <div className="mb-2">
+            <p className="text-base font-bold text-secondary">Fiscal Year {budget?.fiscal_year || new Date().getFullYear()}</p>
+          </div>
+
+          {/* KPI Grid - Budget */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <StatCard
-              title="Department Budget"
+              title="Total Department Allocation"
               value={budget ? `₱${budget.allocated.toLocaleString()}` : "N/A"}
               icon={icons.budget}
               colorScheme="primary"
-              subtitle="Total allocation"
+              subtitle="Total Admin Allocation"
             />
             <StatCard
-              title="Available Budget"
-              value={budget ? `₱${budget.available.toLocaleString()}` : "N/A"}
-              icon={icons.available}
-              colorScheme="accent"
-              subtitle="Ready to use"
-            />
-            <StatCard
-              title="Reserved Budget"
-              value={budget ? `₱${budget.reserved.toLocaleString()}` : "N/A"}
-              icon={icons.reserved}
-              colorScheme="gold"
-              subtitle="Pending PRs"
-            />
-            <StatCard
-              title="Spent Budget"
-              value={budget ? `₱${budget.spent.toLocaleString()}` : "N/A"}
-              icon={icons.spent}
+              title="Total Allocated Budget"
+              value={`₱${categoryAllocated.toLocaleString()}`}
+              icon={icons.categoryAllocated}
               colorScheme="blue"
-              subtitle="Completed"
+              subtitle="Assigned to Categories"
+            />
+            <StatCard
+              title="Total Available Budget"
+              value={`₱${Math.max(0, categoryRemaining).toLocaleString()}`}
+              icon={icons.categoryRemaining}
+              colorScheme="gold"
+              subtitle="Unallocated to Categories"
             />
           </div>
 
-          {/* PR Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard title="Pending Requests" value={pendingRequests} icon={icons.pending} colorScheme="gold" subtitle="Awaiting approval" />
-            <StatCard title="Approved Requests" value={approvedRequests} icon={icons.approved} colorScheme="accent" subtitle="Ready for procurement" />
+          {/* KPI Grid - PRs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <StatCard 
+              title="Pending Requests" 
+              value={pendingRequests} 
+              icon={icons.pending} 
+              colorScheme="gold" 
+              subtitle="Awaiting Approval" 
+            />
+            <StatCard 
+              title="Approved Requests" 
+              value={approvedRequests} 
+              icon={icons.approved} 
+              colorScheme="accent" 
+              subtitle="In Progress" 
+            />
+            <StatCard 
+              title="Rejected Requests" 
+              value={prs.filter((pr) => pr.status === "Rejected").length} 
+              icon={icons.document} 
+              colorScheme="red" 
+              subtitle="Declined" 
+            />
           </div>
 
           {/* Recent Requests */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-secondary">My Recent Requests</h3>
               <Link href="/department-head/purchase-requests" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
-                View All →
+                View All PRs →
               </Link>
             </div>
 
             {prs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <svg className="w-12 h-12 text-secondary/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-sm text-secondary/50 font-medium">You haven&apos;t submitted any requests yet.</p>
-                <Link href="/department-head/purchase-requests/create" className="text-sm text-primary font-semibold hover:underline">
-                  Create your first request →
+                <p className="text-sm text-slate-500 font-medium">No purchase requests found.</p>
+                <Link href="/department-head/purchase-requests" className="text-sm text-primary font-semibold hover:underline mt-2">
+                  Go to My Requests to create one
                 </Link>
               </div>
             ) : (
@@ -146,20 +185,21 @@ export default function DepartmentHeadDashboardPage() {
                 {prs.slice(0, 5).map((pr) => (
                   <li key={pr.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors">
                     <div>
-                      <p className="text-sm font-bold text-primary">{pr.prNumber}</p>
-                      <p className="text-xs text-secondary/60 mt-0.5 max-w-xs truncate">{pr.description}</p>
-                      <p className="text-xs text-secondary/40 mt-0.5">{pr.dateRequested}</p>
+                      <p className="text-sm font-bold text-secondary">{pr.prNumber}</p>
+                      <p className="text-xs text-slate-500 mt-0.5 max-w-xs truncate">{pr.description}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{pr.dateRequested}</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                       <div className="text-right">
                         <p className="text-sm font-bold text-secondary">₱{pr.amount.toLocaleString()}</p>
                         <StatusBadge status={pr.status} />
                       </div>
                       <Link
-                        href={`/department-head/purchase-requests/${pr.id}`}
-                        className="text-xs font-semibold text-secondary/60 hover:text-primary transition-colors"
+                        href={`/department-head/purchase-requests`}
+                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        title="View details"
                       >
-                        View →
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                       </Link>
                     </div>
                   </li>

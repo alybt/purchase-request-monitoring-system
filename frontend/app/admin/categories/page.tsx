@@ -161,8 +161,19 @@ export default function AdminCategoriesPage() {
       )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-100">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <h3 className="text-base font-bold text-secondary">Available Categories</h3>
+          <div className="relative group cursor-help">
+            <svg className="w-4 h-4 text-secondary/40 hover:text-secondary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="absolute left-6 top-0 hidden group-hover:block w-72 p-3 bg-slate-800 text-white text-xs rounded-xl shadow-xl z-50 pointer-events-none">
+              <p className="font-bold text-white mb-1">About Categories</p>
+              <p className="text-slate-300 leading-relaxed">
+                Categories are predefined and used to classify purchase requests. Department Heads allocate their budget across these categories in the Category Budget section.
+              </p>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           {loading ? (
@@ -276,12 +287,7 @@ export default function AdminCategoriesPage() {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-        <h3 className="text-sm font-bold text-blue-800 mb-2">About Categories</h3>
-        <p className="text-sm text-blue-700">
-          Categories are predefined and used to classify purchase requests. Department Heads allocate their budget across these categories in the Category Budget Planning section.
-        </p>
-      </div>
+
 
       {/* Modals */}
       <CategoryFormModal

@@ -105,7 +105,11 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
             >
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-bold text-secondary leading-tight">{displayName}</p>
-                <p className="text-xs text-secondary/50 capitalize">{role ?? user?.role}</p>
+                <p className="text-xs text-secondary/50 capitalize">
+                  {role === "department_head" && user?.department?.name 
+                    ? `${user.department.name} Head` 
+                    : (role ?? user?.role)}
+                </p>
               </div>
               <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
                 <span className="text-sm font-bold text-primary">{initial}</span>
@@ -119,7 +123,11 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
               <div className="absolute right-0 top-12 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden py-1">
                 <div className="px-4 py-3 border-b border-slate-100">
                   <p className="text-sm font-bold text-secondary truncate">{displayName}</p>
-                  <p className="text-xs text-secondary/50 capitalize">{role ?? user?.role}</p>
+                  <p className="text-xs text-secondary/50 capitalize">
+                    {role === "department_head" && user?.department?.name 
+                      ? `${user.department.name} Head` 
+                      : (role ?? user?.role)}
+                  </p>
                 </div>
                 {role === "department_head" && (
                   <button

@@ -105,19 +105,19 @@ class PurchaseRequest extends Model
         return $this->hasMany(PurchaseRequestStatusHistory::class)->orderBy('created_at');
     }
 
-    public function canBeSubmitted(): bool
+    public function canBePending(): bool
     {
         return in_array($this->status, ['Draft', 'Request']);
     }
 
     public function canBeApproved(): bool
     {
-        return in_array($this->status, ['Submitted', 'Request', 'Draft']);
+        return in_array($this->status, ['Pending', 'Request', 'Draft']);
     }
 
     public function canBeRejected(): bool
     {
-        return in_array($this->status, ['Submitted', 'Request', 'Draft']);
+        return in_array($this->status, ['Pending', 'Request', 'Draft']);
     }
 
     public function canBeOrdered(): bool
@@ -145,9 +145,9 @@ class PurchaseRequest extends Model
         return $query->where('department_id', $departmentId);
     }
 
-    public function scopePending($query)
+    public function scopePendingApproval($query)
     {
-        return $query->where('status', 'Submitted');
+        return $query->where('status', 'Pending');
     }
 
     public function scopeApproved($query)

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export interface SidebarMenuItem {
   name: string;
@@ -28,6 +28,11 @@ const roleColors = {
 
 export default function AppSidebar({ menuItems, role }: SidebarProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const pathname = usePathname();
   const router = useRouter();
   const colors = roleColors[role];
@@ -64,7 +69,9 @@ export default function AppSidebar({ menuItems, role }: SidebarProps) {
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
             <span className={`text-xs font-medium ${colors.label} whitespace-nowrap`}>
-              {roleTitles[role]}
+              {mounted && role === "department_head" && localStorage.getItem("user")
+                ? `${JSON.parse(localStorage.getItem("user") || "{}").department?.name || "Information Technology"} Head` 
+                : roleTitles[role]}
             </span>
           </div>
         </div>

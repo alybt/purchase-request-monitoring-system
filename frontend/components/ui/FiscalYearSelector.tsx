@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { getAllCompanyBudgets } from "@/services/budget.service";
+import { getAvailableFiscalYears } from "@/services/budget.service";
 
 interface FiscalYearSelectorProps {
   value: number;
@@ -12,7 +12,7 @@ interface FiscalYearSelectorProps {
 }
 
 /**
- * Dynamic Fiscal Year Selector — displays only fiscal years that exist in the database.
+ * Dynamic Fiscal Year Selector — displays all fiscal years available across the database.
  * Navigation buttons shift backward/forward through the available years.
  */
 export default function FiscalYearSelector({
@@ -25,14 +25,13 @@ export default function FiscalYearSelector({
 
   useEffect(() => {
     let mounted = true;
-    getAllCompanyBudgets()
-      .then(budgets => {
+    getAvailableFiscalYears()
+      .then(years => {
         if (!mounted) return;
-        const years = budgets.map(b => b.fiscal_year).sort((a, b) => a - b);
         if (years.length > 0) {
           setAvailableYears(years);
           if (!years.includes(value)) {
-            // Auto-select the latest year if the current value is not in the database
+            // Auto-select the latest year if current value is not in database
             onChange(years[years.length - 1]);
           }
         } else {
@@ -45,6 +44,13 @@ export default function FiscalYearSelector({
       .catch(console.error);
     return () => { mounted = false; };
   }, []); // Only fetch once on mount
+
+  // If the parent passes a value that is not in availableYears (e.g., newly created year), add it.
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(value)) {
+      setAvailableYears(prev => [...prev, value].sort((a, b) => a - b));
+    }
+  }, [value, availableYears]);
 
   const currentIndex = availableYears.indexOf(value);
 

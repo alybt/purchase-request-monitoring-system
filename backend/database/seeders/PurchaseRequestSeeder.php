@@ -80,7 +80,7 @@ class PurchaseRequestSeeder extends Seeder
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
             'from_status' => 'Draft',
-            'to_status' => 'Submitted',
+            'to_status' => 'Pending',
             'changed_by' => $requestedBy->id,
             'remarks' => 'Submitted for approval',
             'created_at' => Carbon::now()->subDays(5),
@@ -88,7 +88,7 @@ class PurchaseRequestSeeder extends Seeder
 
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
-            'from_status' => 'Submitted',
+            'from_status' => 'Pending',
             'to_status' => 'Approved',
             'changed_by' => $approvedBy->id,
             'remarks' => 'Approved as requested',
@@ -105,7 +105,7 @@ class PurchaseRequestSeeder extends Seeder
             'requested_by' => $requestedBy->id,
             'purpose' => 'Purchase additional laptops for new hires joining next month.',
             'total_estimated_cost' => 300000.00,
-            'status' => 'Submitted',
+            'status' => 'Pending',
             'submitted_at' => Carbon::now()->subDays(1),
         ]);
 
@@ -136,7 +136,7 @@ class PurchaseRequestSeeder extends Seeder
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
             'from_status' => 'Draft',
-            'to_status' => 'Submitted',
+            'to_status' => 'Pending',
             'changed_by' => $requestedBy->id,
             'remarks' => 'Submitted for approval',
             'created_at' => Carbon::now()->subDays(1),
@@ -185,7 +185,7 @@ class PurchaseRequestSeeder extends Seeder
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
             'from_status' => 'Draft',
-            'to_status' => 'Submitted',
+            'to_status' => 'Pending',
             'changed_by' => $requestedBy->id,
             'remarks' => 'Submitted for approval',
             'created_at' => Carbon::now()->subDays(10),
@@ -193,7 +193,7 @@ class PurchaseRequestSeeder extends Seeder
 
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
-            'from_status' => 'Submitted',
+            'from_status' => 'Pending',
             'to_status' => 'Rejected',
             'changed_by' => $approvedBy->id,
             'remarks' => 'Request does not align with business requirements',
@@ -245,7 +245,7 @@ class PurchaseRequestSeeder extends Seeder
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
             'from_status' => 'Draft',
-            'to_status' => 'Submitted',
+            'to_status' => 'Pending',
             'changed_by' => $requestedBy->id,
             'remarks' => 'Submitted for approval',
             'created_at' => Carbon::now()->subDays(15),
@@ -253,7 +253,7 @@ class PurchaseRequestSeeder extends Seeder
 
         PurchaseRequestStatusHistory::create([
             'purchase_request_id' => $pr->id,
-            'from_status' => 'Submitted',
+            'from_status' => 'Pending',
             'to_status' => 'Approved',
             'changed_by' => $approvedBy->id,
             'remarks' => 'Approved',

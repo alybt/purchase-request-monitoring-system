@@ -24,6 +24,24 @@ class CompanyBudgetController extends Controller
     }
 
     /**
+     * Get all distinct fiscal years available across budgets and purchase requests.
+     */
+    public function availableYears()
+    {
+        try {
+            $cbYears = CompanyBudget::pluck('fiscal_year')->toArray();
+            $dbYears = \App\Models\DepartmentBudget::distinct()->pluck('fiscal_year')->toArray();
+            $prYears = \App\Models\PurchaseRequest::selectRaw('EXTRACT(YEAR FROM created_at) as y')->distinct()->pluck('y')->map(fn($y) => (int)$y)->toArray();
+            $allYears = array_unique(array_merge($cbYears, $dbYears, $prYears, [(int)now()->year]));
+            sort($allYears);
+            return response()->json(['years' => array_values($allYears)], 200);
+        } catch (\Throwable $e) {
+            Log::error('Get available years failure: ' . $e->getMessage());
+            return response()->json(['years' => [(int)now()->year]], 200);
+        }
+    }
+
+    /**
      * Get the company budget for a specific fiscal year.
      */
     public function show($fiscalYear)
@@ -93,6 +111,17 @@ class CompanyBudgetController extends Controller
                         'message' => "Carry forward (₱" . number_format($carryForward, 2) . ") cannot exceed previous year's remaining balance (₱" . number_format($prevRem, 2) . ")."
                     ], 422);
                 }
+            }
+
+            // Ensure the new total available budget is not less than the already allocated amount
+            $totalAllocatedForYear = \App\Models\DepartmentBudget::where('fiscal_year', $fiscalYear)
+                ->sum('allocated_amount');
+            $newTotalAvailable = $totalBudget + $carryForward;
+            
+            if ($newTotalAvailable < $totalAllocatedForYear) {
+                return response()->json([
+                    'message' => "The total available budget (₱" . number_format($newTotalAvailable, 2) . ") cannot be less than the already allocated amount to departments (₱" . number_format($totalAllocatedForYear, 2) . ")."
+                ], 422);
             }
 
             $budget = CompanyBudget::firstOrNew(['fiscal_year' => $fiscalYear]);

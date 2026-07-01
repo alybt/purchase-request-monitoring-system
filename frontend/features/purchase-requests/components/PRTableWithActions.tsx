@@ -6,17 +6,22 @@ interface PRTableWithActionsProps {
   data: PRData[];
   selectedRows: string[];
   onSelectRows: (ids: string[]) => void;
-  onView: (pr: PRData) => void;
-  onEdit: (pr: PRData) => void;
-  onDelete: (pr: PRData) => void;
+  onView?: (pr: PRData) => void;
+  onEdit?: (pr: PRData) => void;
+  onDelete?: (pr: PRData) => void;
   showCheckboxes: boolean;
+  renderActions?: (pr: PRData) => React.ReactNode;
 }
 
 const getStatusColor = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "pending":
+    case "submitted":
       return "bg-yellow-100 text-yellow-800";
     case "approved":
+    case "ordered":
+    case "received":
+    case "released":
       return "bg-green-100 text-green-800";
     case "rejected":
       return "bg-red-100 text-red-800";
@@ -35,6 +40,7 @@ export default function PRTableWithActions({
   onEdit,
   onDelete,
   showCheckboxes,
+  renderActions,
 }: PRTableWithActionsProps) {
   const toggleSelectAll = () => {
     if (selectedRows.length === data.length) {
@@ -87,10 +93,7 @@ export default function PRTableWithActions({
             <th className="px-6 py-4 text-left text-sm font-semibold text-secondary">
               Date
             </th>
-            <th className="px-6 py-4 text-left text-sm font-semibold text-secondary">
-              Due Date
-            </th>
-            <th className="px-6 py-4 text-left text-sm font-semibold text-secondary">
+            <th className="px-6 py-4 text-right text-sm font-semibold text-secondary sticky right-0 bg-slate-50 border-l border-slate-100">
               Actions
             </th>
           </tr>
@@ -137,35 +140,44 @@ export default function PRTableWithActions({
               <td className="px-6 py-4 text-sm text-secondary/70">
                 {row.dateRequested}
               </td>
-              <td className="px-6 py-4 text-sm text-secondary/70">
-                {row.dueDate}
-              </td>
-              <td className="px-6 py-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onView(row)}
-                    className="text-primary hover:text-primary/80 font-medium transition-colors"
-                    title="View PR details"
-                  >
-                    View
-                  </button>
-                  <span className="text-slate-200">|</span>
-                  <button
-                    onClick={() => onEdit(row)}
-                    className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                    title="Edit PR"
-                  >
-                    Edit
-                  </button>
-                  <span className="text-slate-200">|</span>
-                  <button
-                    onClick={() => onDelete(row)}
-                    className="text-red-600 hover:text-red-700 font-medium transition-colors"
-                    title="Delete PR"
-                  >
-                    Delete
-                  </button>
-                </div>
+              <td className="px-6 py-4 text-sm text-right sticky right-0 bg-white group-hover:bg-slate-50 transition-colors border-l border-slate-100">
+                {renderActions ? renderActions(row) : (
+                  <div className="flex items-center justify-end gap-2">
+                    {onView && (
+                      <button
+                        onClick={() => onView(row)}
+                        className="text-primary hover:text-primary/80 font-medium transition-colors"
+                        title="View PR details"
+                      >
+                        View
+                      </button>
+                    )}
+                    {onEdit && (
+                      <>
+                        <span className="text-slate-200">|</span>
+                        <button
+                          onClick={() => onEdit(row)}
+                          className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                          title="Edit PR"
+                        >
+                          Edit
+                        </button>
+                      </>
+                    )}
+                    {onDelete && (
+                      <>
+                        <span className="text-slate-200">|</span>
+                        <button
+                          onClick={() => onDelete(row)}
+                          className="text-red-600 hover:text-red-700 font-medium transition-colors"
+                          title="Delete PR"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </td>
             </tr>
           ))}
