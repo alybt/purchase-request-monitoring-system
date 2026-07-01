@@ -163,8 +163,8 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-bold text-secondary leading-tight">{displayName}</p>
                 <p className="text-xs text-secondary/50 capitalize">
-                  {role === "department_head" && user?.department?.name 
-                    ? `${user.department.name} Head` 
+                  {role === "department_head" && (user?.department as any)?.name 
+                    ? `${(user?.department as any)?.name} Head` 
                     : (role ?? user?.role)}
                 </p>
               </div>
@@ -181,8 +181,8 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
                 <div className="px-4 py-3 border-b border-slate-100">
                   <p className="text-sm font-bold text-secondary truncate">{displayName}</p>
                   <p className="text-xs text-secondary/50 capitalize">
-                    {role === "department_head" && user?.department?.name 
-                      ? `${user.department.name} Head` 
+                    {role === "department_head" && (user?.department as any)?.name 
+                      ? `${(user?.department as any)?.name} Head` 
                       : (role ?? user?.role)}
                   </p>
                 </div>

@@ -161,11 +161,15 @@ export async function getPurchaseRequests(
   search = "",
   department = "",
   status = "",
+  fiscalYear: number | "" = "",
+  month: number | null = null,
 ): Promise<PRData[]> {
   const params = new URLSearchParams();
   if (search) params.append("search", search);
   if (department) params.append("department", department);
   if (status) params.append("status", status);
+  if (fiscalYear) params.append("fiscalYear", String(fiscalYear));
+  if (month !== null) params.append("month", String(month));
 
   const response = await fetch(
     `${API_URL}/purchase-requests?${params.toString()}`,
@@ -185,10 +189,17 @@ export async function getPurchaseRequests(
   return (data.purchase_requests || []).map(mapBackendPRToFrontend);
 }
 
-export async function getPurchaseRequestsSummary(): Promise<
+export async function getPurchaseRequestsSummary(
+  fiscalYear: number | "" = "",
+  month: number | null = null,
+): Promise<
   Record<string, number>
 > {
-  const response = await fetch(`${API_URL}/purchase-requests/summary`, {
+  const params = new URLSearchParams();
+  if (fiscalYear) params.append("fiscalYear", String(fiscalYear));
+  if (month !== null) params.append("month", String(month));
+
+  const response = await fetch(`${API_URL}/purchase-requests/summary?${params.toString()}`, {
     method: "GET",
     headers: getHeaders(),
     cache: "no-store",

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import SearchFilters from "@/components/ui/SearchFilters";
+import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
 import EmptyState from "@/components/ui/EmptyState";
 import PRTableWithActions from "@/features/purchase-requests/components/PRTableWithActions";
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
@@ -49,6 +50,8 @@ export default function AdminPRManagementPage() {
 
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [filterYear, setFilterYear] = useState<number | "">("");
+  const [filterMonth, setFilterMonth] = useState<number | null>(null);
 
   // Modal states
   const [viewPR, setViewPR] = useState<PRData | null>(null);
@@ -67,7 +70,7 @@ export default function AdminPRManagementPage() {
 
   useEffect(() => {
     fetchData();
-  }, [search, departmentFilter, activePhase, activeTab]);
+  }, [search, departmentFilter, activePhase, activeTab, filterYear, filterMonth]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -90,8 +93,8 @@ export default function AdminPRManagementPage() {
     setLoading(true);
     try {
       const [data, counts] = await Promise.all([
-        getPurchaseRequests(search, departmentFilter, activeTab),
-        getPurchaseRequestsSummary(),
+        getPurchaseRequests(search, departmentFilter, activeTab, filterYear, filterMonth),
+        getPurchaseRequestsSummary(filterYear, filterMonth),
       ]);
       setPrs(data);
       setTabCounts(counts);
@@ -586,12 +589,22 @@ export default function AdminPRManagementPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <SearchFilters
-          searchValue={search}
-          onSearchChange={setSearch}
-          placeholder="Search by PR number, requestor, or purpose..."
-          filters={[]}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex-1 min-w-[280px]">
+          <SearchFilters
+            searchValue={search}
+            onSearchChange={setSearch}
+            placeholder="Search by PR number, requestor, or purpose..."
+            filters={[]}
+          />
+        </div>
+        <FiscalYearSelector
+          value={filterYear}
+          onChange={setFilterYear}
+          monthValue={filterMonth}
+          onMonthChange={setFilterMonth}
+          allowAllYears={true}
+          label="Fiscal Period"
         />
       </div>
 

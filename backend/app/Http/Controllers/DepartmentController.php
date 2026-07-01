@@ -13,26 +13,33 @@ class DepartmentController extends Controller
     public function index(Request $request)
     {
         try {
-            $currentYear = $request->input('fiscal_year', now()->year);
+            $currentYear = $request->input('fiscal_year', $request->input('fiscalYear', self::getFiscalYear()));
             $month = $request->filled('month') ? (int) $request->input('month') : null;
 
             $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
-            $totalCompanyBudget = $companyBudget ? floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward) : 0;
+            $annualCompanyBudget = $companyBudget ? floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward) : 0.0;
+            $totalCompanyBudget = self::calculateBudgetForPeriod($annualCompanyBudget, $month);
 
             $departments = Department::with([
-                'departmentBudgets' => function ($q) use ($currentYear, $month) {
+                'departmentBudgets' => function ($q) use ($currentYear) {
                     $q->where('fiscal_year', $currentYear);
-                    if ($month !== null) {
-                        $q->where('month', $month);
-                    }
                 }
             ])->orderBy('name')->get();
 
-            $mapped = $departments->map(function ($dept) use ($currentYear, $totalCompanyBudget) {
-                $hasAllocation = $dept->departmentBudgets->count() > 0;
-                $allocated = floatval($dept->departmentBudgets->sum('allocated_amount'));
-                $reserved = floatval($dept->departmentBudgets->sum('reserved_amount'));
-                $spent = floatval($dept->departmentBudgets->sum('spent_amount'));
+            $mapped = $departments->map(function ($dept) use ($month, $totalCompanyBudget) {
+                $deptBudgets = $dept->departmentBudgets;
+                $hasAllocation = $deptBudgets->count() > 0;
+
+                $annualAllocated = floatval($deptBudgets->sum('allocated_amount'));
+                $allocated = self::calculateBudgetForPeriod($annualAllocated, $month);
+
+                if ($month !== null) {
+                    $reserved = floatval($deptBudgets->where('month', $month)->sum('reserved_amount'));
+                    $spent = floatval($deptBudgets->where('month', $month)->sum('spent_amount'));
+                } else {
+                    $reserved = floatval($deptBudgets->sum('reserved_amount'));
+                    $spent = floatval($deptBudgets->sum('spent_amount'));
+                }
                 $available = $allocated - $reserved - $spent;
                 $share = $totalCompanyBudget > 0 ? ($allocated / $totalCompanyBudget) * 100 : 0;
 
@@ -48,7 +55,7 @@ class DepartmentController extends Controller
                     'reserved_budget' => $reserved,
                     'spent_budget' => $spent,
                     'share' => $share,
-                    'fiscal_year' => $currentYear,
+                    'fiscal_year' => $deptBudgets->first()?->fiscal_year,
                 ];
             });
 
@@ -145,7 +152,7 @@ class DepartmentController extends Controller
                 'month' => 'nullable|integer|min:1|max:12',
             ]);
 
-            $fiscalYear = $request->input('fiscal_year', now()->year);
+            $fiscalYear = $request->input('fiscal_year', self::getFiscalYear());
             $month = $request->input('month', now()->month);
             $allocatedAmount = $request->input('allocated_amount');
 
@@ -305,7 +312,7 @@ class DepartmentController extends Controller
     public function budgetSummary(Request $request)
     {
         try {
-            $currentYear = $request->input('fiscal_year', now()->year);
+            $currentYear = $request->input('fiscal_year', $request->input('fiscalYear', self::getFiscalYear()));
             $month = $request->filled('month') ? (int) $request->input('month') : null;
 
             $departments = Department::with([
@@ -314,21 +321,29 @@ class DepartmentController extends Controller
                 }
             ])->orderBy('name')->get();
 
+            $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
+            $annualCompanyBudget = $companyBudget ? (floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward)) : 0.0;
+            $totalCompanyBudget = self::calculateBudgetForPeriod($annualCompanyBudget, $month);
+
             $departmentSummaries = $departments->map(function ($dept) use ($month) {
                 $deptBudgets = $dept->departmentBudgets;
 
-                $activeBudgets = ($month !== null)
-                    ? $deptBudgets->where('month', $month)
-                    : $deptBudgets;
+                $annualAllocated = floatval($deptBudgets->sum('allocated_amount'));
+                $allocated = self::calculateBudgetForPeriod($annualAllocated, $month);
 
-                $allocated = floatval($activeBudgets->sum('allocated_amount'));
-                $reserved = floatval($activeBudgets->sum('reserved_amount'));
-                $spent = floatval($activeBudgets->sum('spent_amount'));
+                if ($month !== null) {
+                    $reserved = floatval($deptBudgets->where('month', $month)->sum('reserved_amount'));
+                    $spent = floatval($deptBudgets->where('month', $month)->sum('spent_amount'));
+                } else {
+                    $reserved = floatval($deptBudgets->sum('reserved_amount'));
+                    $spent = floatval($deptBudgets->sum('spent_amount'));
+                }
 
                 $monthlyBreakdown = [];
                 for ($m = 1; $m <= 12; $m++) {
                     $mBudget = $deptBudgets->firstWhere('month', $m);
-                    $allocM = $mBudget ? floatval($mBudget->allocated_amount) : 0.0;
+                    // Standard monthly allocation is annual / 12
+                    $allocM = self::calculateBudgetForPeriod($annualAllocated, $m);
                     $resM = $mBudget ? floatval($mBudget->reserved_amount) : 0.0;
                     $spM = $mBudget ? floatval($mBudget->spent_amount) : 0.0;
                     $monthlyBreakdown[] = [
@@ -357,9 +372,6 @@ class DepartmentController extends Controller
             $totalReserved = $departmentSummaries->sum('reserved');
             $totalSpent = $departmentSummaries->sum('spent');
             $totalAvailable = $totalAllocated - $totalReserved - $totalSpent;
-
-            $companyBudget = \App\Models\CompanyBudget::where('fiscal_year', $currentYear)->first();
-            $totalCompanyBudget = $companyBudget ? (floatval($companyBudget->total_budget) + floatval($companyBudget->carry_forward)) : 0;
 
             $departmentSummaries = $departmentSummaries->map(function ($summary) use ($totalCompanyBudget) {
                 $summary['percentage'] = $totalCompanyBudget > 0 ? round(($summary['allocated'] / $totalCompanyBudget) * 100, 2) : 0;
@@ -393,7 +405,7 @@ class DepartmentController extends Controller
                 return response()->json(['message' => 'Department not found.'], 404);
             }
 
-            $year = $request->input('fiscal_year', now()->year);
+            $year = $request->input('fiscal_year', self::getFiscalYear());
             $currentMonth = now()->month;
 
             // 1. Last 12 months (rolling) calculations
@@ -544,7 +556,7 @@ class DepartmentController extends Controller
     public function destroyBudget(Request $request, $id)
     {
         try {
-            $fiscalYear = $request->input('fiscal_year', now()->year);
+            $fiscalYear = $request->input('fiscal_year', self::getFiscalYear());
             $month = $request->filled('month') ? (int) $request->input('month') : null;
 
             $query = DepartmentBudget::where('department_id', $id)

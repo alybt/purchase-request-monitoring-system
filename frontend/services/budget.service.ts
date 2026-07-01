@@ -57,8 +57,16 @@ export async function getCategories(): Promise<Category[]> {
   return data.categories || [];
 }
 
-export async function getMyDepartmentBudget(): Promise<DepartmentBudgetResponse> {
-  const response = await fetch(`${API_URL}/budget/my-department`, {
+export async function getMyDepartmentBudget(
+  fiscalYear?: number | "",
+  month?: number | null
+): Promise<DepartmentBudgetResponse> {
+  const params = new URLSearchParams();
+  if (fiscalYear) params.append("fiscal_year", String(fiscalYear));
+  if (month) params.append("month", String(month));
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+
+  const response = await fetch(`${API_URL}/budget/my-department${queryString}`, {
     method: "GET",
     headers: getHeaders(),
     cache: "no-store",
@@ -72,8 +80,17 @@ export async function getMyDepartmentBudget(): Promise<DepartmentBudgetResponse>
   return response.json();
 }
 
-export async function getCategoryBudget(categoryId: number): Promise<CategoryBudget | null> {
-  const response = await fetch(`${API_URL}/budget/category/${categoryId}`, {
+export async function getCategoryBudget(
+  categoryId: number,
+  fiscalYear?: number | "",
+  month?: number | null
+): Promise<CategoryBudget | null> {
+  const params = new URLSearchParams();
+  if (fiscalYear) params.append("fiscal_year", String(fiscalYear));
+  if (month) params.append("month", String(month));
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+
+  const response = await fetch(`${API_URL}/budget/category/${categoryId}${queryString}`, {
     method: "GET",
     headers: getHeaders(),
     cache: "no-store",

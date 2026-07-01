@@ -9,7 +9,6 @@ import {
 import { AllocateBudgetModal } from "@/features/departments/components/AllocateBudgetModal";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
-import MonthSelector from "@/components/ui/MonthSelector";
 
 const API_URL = "http://127.0.0.1:8000/api";
 
@@ -38,6 +37,8 @@ interface Department {
   status: string;
 }
 
+import { getFiscalYear } from "@/lib/date-utils";
+
 export default function DepartmentManagementPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [totalCompanyBudget, setTotalCompanyBudget] = useState<number>(0);
@@ -45,7 +46,7 @@ export default function DepartmentManagementPage() {
 
   // Filters
   const [filterYear, setFilterYear] = useState<number>(
-    new Date().getFullYear(),
+    getFiscalYear(),
   );
   const [filterMonth, setFilterMonth] = useState<number | null>(null);
 
@@ -241,13 +242,12 @@ export default function DepartmentManagementPage() {
         <div className="flex flex-wrap items-center gap-4">
           <FiscalYearSelector
             value={filterYear}
-            onChange={setFilterYear}
+            onChange={(val) => {
+              if (val !== "") setFilterYear(val);
+            }}
+            monthValue={filterMonth}
+            onMonthChange={setFilterMonth}
             label="Fiscal Year"
-          />
-          <MonthSelector
-            value={filterMonth}
-            onChange={setFilterMonth}
-            label="Month"
           />
         </div>
       </div>

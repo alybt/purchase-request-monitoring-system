@@ -59,14 +59,14 @@ class PurchaseRequestTest extends TestCase
 
         \App\Models\DepartmentBudget::create([
             'department_id' => $hrDept->id,
-            'fiscal_year' => date('Y'),
+            'fiscal_year' => \App\Http\Controllers\Controller::getFiscalYear(now()),
             'allocated_amount' => 100000.00,
             'reserved_amount' => 0.00,
             'spent_amount' => 0.00,
         ]);
         \App\Models\DepartmentBudget::create([
             'department_id' => $opsDept->id,
-            'fiscal_year' => date('Y'),
+            'fiscal_year' => \App\Http\Controllers\Controller::getFiscalYear(now()),
             'allocated_amount' => 100000.00,
             'reserved_amount' => 0.00,
             'spent_amount' => 0.00,

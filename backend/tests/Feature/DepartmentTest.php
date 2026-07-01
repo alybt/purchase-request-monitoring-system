@@ -54,7 +54,7 @@ class DepartmentTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/departments?fiscal_year=2026&month=6');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('departments.0.budget_allocation', 5000);
+        $response->assertJsonPath('departments.0.budget_allocation', 1250);
         $response->assertJsonPath('month', 6);
     }
 

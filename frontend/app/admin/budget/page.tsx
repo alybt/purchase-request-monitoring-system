@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
-import MonthSelector from "@/components/ui/MonthSelector";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import { printBudgetAllocation } from "@/lib/print";
+import { getFiscalYear } from "@/lib/date-utils";
 import {
   getBudgetSummary,
   updateDepartmentBudget,
@@ -119,7 +119,7 @@ export default function CompanyBudgetPage() {
 
   // Filter state
   const [selectedYear, setSelectedYear] = useState<number>(
-    new Date().getFullYear(),
+    getFiscalYear(),
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
@@ -133,7 +133,7 @@ export default function CompanyBudgetPage() {
     null,
   );
   const [cbFiscalYear, setCbFiscalYear] = useState<number>(
-    new Date().getFullYear(),
+    getFiscalYear(),
   );
   const [cbAllowedYears, setCbAllowedYears] = useState<number[]>([]);
   const [cbAmount, setCbAmount] = useState("");
@@ -209,6 +209,11 @@ export default function CompanyBudgetPage() {
     return isNaN(num) ? 0 : num;
   };
 
+  const divisor = selectedMonth !== null ? 12 : 1;
+  const displayCompanyBudget = activeCompanyBudget ? safeNum(activeCompanyBudget.total_budget) / divisor : 0;
+  const displayCarryForward = activeCompanyBudget ? safeNum(activeCompanyBudget.carry_forward) / divisor : 0;
+  const displayTotalAvailable = displayCompanyBudget + displayCarryForward;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
@@ -247,7 +252,7 @@ export default function CompanyBudgetPage() {
                 setCbError("");
                 setCbSuccess("");
 
-                const currentYear = new Date().getFullYear();
+                const currentYear = getFiscalYear();
                 const budgets = await getAllCompanyBudgets().catch(() => []);
                 const existingYears = budgets.map((b) => Number(b.fiscal_year));
 
@@ -297,13 +302,12 @@ export default function CompanyBudgetPage() {
         <div className="flex flex-wrap items-center gap-4">
           <FiscalYearSelector
             value={selectedYear}
-            onChange={setSelectedYear}
+            onChange={(val) => {
+              if (val !== "") setSelectedYear(val);
+            }}
+            monthValue={selectedMonth}
+            onMonthChange={setSelectedMonth}
             label="Fiscal Year"
-          />
-          <MonthSelector
-            value={selectedMonth}
-            onChange={setSelectedMonth}
-            label="Month"
           />
         </div>
       </div>
@@ -323,42 +327,42 @@ export default function CompanyBudgetPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard
               title="Approved Budget"
-              value={`₱${safeNum(activeCompanyBudget?.total_budget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              value={`₱${displayCompanyBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.total}
               colorScheme="primary"
-              subtitle={`FY ${fiscalYear} Allocation`}
+              subtitle={selectedMonth !== null ? "Monthly view allocation" : `FY ${fiscalYear} Allocation`}
             />
             <StatCard
               title="Carry Forward"
-              value={`₱${safeNum(activeCompanyBudget?.carry_forward).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              value={`₱${displayCarryForward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.available}
               colorScheme="gold"
-              subtitle="From previous FY"
+              subtitle={selectedMonth !== null ? "Monthly view carry forward" : "From previous FY"}
             />
             <StatCard
               title="Total Available Budget"
-              value={`₱${(safeNum(activeCompanyBudget?.total_budget) + safeNum(activeCompanyBudget?.carry_forward)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              value={`₱${displayTotalAvailable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.available}
               colorScheme="emerald"
-              subtitle="Approved + Carry Forward"
+              subtitle={selectedMonth !== null ? "Monthly view available budget" : "Approved + Carry Forward"}
             />
             <StatCard
               title="Department Budget Allocated"
               value={`₱${safeNum(summary?.total_allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.total}
               colorScheme="accent"
-              subtitle="Total distributed to departments"
+              subtitle={selectedMonth !== null ? "Total distributed for selected month" : "Total distributed to departments"}
             />
             <StatCard
               title="Remaining Budget to Allocate"
-              value={`₱${Math.max(0, safeNum(activeCompanyBudget?.total_budget) + safeNum(activeCompanyBudget?.carry_forward) - safeNum(summary?.total_allocated)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              value={`₱${Math.max(0, displayTotalAvailable - safeNum(summary?.total_allocated)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.available}
               colorScheme="accent"
-              subtitle="Unallocated company budget"
+              subtitle={selectedMonth !== null ? "Unallocated for selected month" : "Unallocated company budget"}
             />
             <StatCard
               title="Total Share Allocated"
-              value={`${(safeNum(activeCompanyBudget?.total_budget) + safeNum(activeCompanyBudget?.carry_forward) > 0 ? (safeNum(summary?.total_allocated) / (safeNum(activeCompanyBudget?.total_budget) + safeNum(activeCompanyBudget?.carry_forward))) * 100 : 0).toFixed(2)}%`}
+              value={`${(displayTotalAvailable > 0 ? (safeNum(summary?.total_allocated) / displayTotalAvailable) * 100 : 0).toFixed(2)}%`}
               icon={icons.total}
               colorScheme="primary"
               subtitle="Percentage of Total Available Budget"
@@ -824,7 +828,7 @@ export default function CompanyBudgetPage() {
                           const maxAllowed =
                             cbAllowedYears.length > 0
                               ? Math.max(...cbAllowedYears)
-                              : new Date().getFullYear();
+                              : getFiscalYear();
                           const nextYear = maxAllowed + 1;
                           if (!cbAllowedYears.includes(nextYear)) {
                             setCbAllowedYears([...cbAllowedYears, nextYear]);
@@ -838,7 +842,7 @@ export default function CompanyBudgetPage() {
                         + Add FY{" "}
                         {cbAllowedYears.length > 0
                           ? Math.max(...cbAllowedYears) + 1
-                          : new Date().getFullYear() + 1}
+                          : getFiscalYear() + 1}
                       </button>
                     </div>
                     <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1">

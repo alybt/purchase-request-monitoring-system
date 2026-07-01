@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import StatCard from "@/components/ui/StatCard";
 import PageHeader from "@/components/ui/PageHeader";
+import { getFiscalYear } from "@/lib/date-utils";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { BarChart, StatusDistribution } from "@/components/ui/DashboardCharts";
 import { getPurchaseRequests } from "@/services/purchase-requests.service";
@@ -122,7 +123,7 @@ export default function AdminDashboardPage() {
   );
 
   useEffect(() => {
-    const year = new Date().getFullYear();
+    const year = getFiscalYear();
     Promise.all([
       getPurchaseRequests().catch(() => []),
       getCompanyBudget(year).catch(() => null),
@@ -188,7 +189,7 @@ export default function AdminDashboardPage() {
               value={`₱${safeNum(companyBudget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               icon={icons.budget}
               colorScheme="primary"
-              subtitle={`Fiscal Year ${new Date().getFullYear()}`}
+              subtitle={`Fiscal Year ${getFiscalYear()}`}
             />
             <StatCard
               title="Total Allocated Budget"

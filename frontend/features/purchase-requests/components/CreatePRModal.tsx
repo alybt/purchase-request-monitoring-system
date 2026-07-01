@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { getCategories, getCategoryBudget } from "@/services/budget.service";
 import type { Category, CategoryBudget } from "@/services/budget.service";
 import { uploadPRAttachments } from "@/services/purchase-requests.service";
+import { getFiscalYear } from "@/lib/date-utils";
 
 interface LineItem {
   id: string;
@@ -48,6 +49,10 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
   const [prStatus, setPrStatus] = useState<string | null>(null);
   const [rejectionRemarks, setRejectionRemarks] = useState<{ by: string, on: string, reason: string } | null>(null);
 
+  const [prFiscalYear, setPrFiscalYear] = useState<number>(getFiscalYear());
+  const [prMonth, setPrMonth] = useState<number>(new Date().getMonth() + 1);
+  const [loadingBudget, setLoadingBudget] = useState(false);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("user");
@@ -84,6 +89,11 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
             const pr = data.purchase_request;
             if (pr) {
               setPrStatus(pr.status);
+              if (pr.created_at) {
+                const prDate = new Date(pr.created_at);
+                setPrFiscalYear(getFiscalYear(prDate));
+                setPrMonth(prDate.getMonth() + 1);
+              }
               if (pr.status === "Rejected" && pr.status_history) {
                 const rejectedHist = [...pr.status_history].reverse().find((h: any) => h.to_status === "Rejected");
                 if (rejectedHist) {
@@ -108,16 +118,25 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
             }
           })
           .catch(err => console.error("Failed to load PR details", err));
+      } else {
+        setPrFiscalYear(getFiscalYear());
+        setPrMonth(new Date().getMonth() + 1);
       }
     }
   }, [isOpen, prIdToEdit]);
 
   useEffect(() => {
-    if (!category) { setCategoryBudget(null); return; }
-    getCategoryBudget(Number(category))
+    if (!category) {
+      setCategoryBudget(null);
+      setLoadingBudget(false);
+      return;
+    }
+    setLoadingBudget(true);
+    getCategoryBudget(Number(category), prFiscalYear, prMonth)
       .then(setCategoryBudget)
-      .catch(() => setCategoryBudget(null));
-  }, [category]);
+      .catch(() => setCategoryBudget(null))
+      .finally(() => setLoadingBudget(false));
+  }, [category, prFiscalYear, prMonth]);
 
   const itemsTotal = items.reduce((sum, i) => sum + (i.quantity || 0) * (i.estimatedCost || 0), 0);
 
@@ -329,7 +348,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                 <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">1</span>
                 Purchase Request Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-secondary">Department</label>
                   <input 
@@ -353,7 +372,16 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                     ))}
                   </select>
                 </div>
-                <div className="md:col-span-2 space-y-1.5">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-secondary">Fiscal Year</label>
+                  <input 
+                    type="text" 
+                    value={`FY ${prFiscalYear}`} 
+                    disabled 
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 cursor-not-allowed text-black font-semibold"
+                  />
+                </div>
+                <div className="md:col-span-3 space-y-1.5">
                   <label className="block text-sm font-semibold text-secondary">Purpose / Justification</label>
                   <textarea
                     value={purpose}
@@ -373,74 +401,90 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                 Budget Summary
               </h2>
               
-              {categoryBudget ? (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
-                    <div>
-                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Department</p>
-                      <p className="text-sm font-semibold text-secondary">{user?.department?.name || "Information Technology"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Category</p>
-                      <p className="text-sm font-semibold text-secondary">{categories.find(c => c.id === Number(category))?.name || "Hardware"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Fiscal Year</p>
-                      <p className="text-sm font-semibold text-secondary">FY {new Date().getFullYear()}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
-                    <div>
-                      <p className="text-xs text-secondary font-medium mb-1">Category Budget</p>
-                      <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-secondary font-medium mb-1">Allocated Amount</p>
-                      <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-secondary font-medium mb-1">Current Remaining</p>
-                      <p className="text-base font-bold text-emerald-600">₱{categoryRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-secondary font-medium mb-1">Current Request Total</p>
-                      <p className="text-xl font-extrabold text-primary">₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-secondary font-medium mb-1">Remaining After Request</p>
-                      <p className={`text-xl font-extrabold ${budgetExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
-                        ₱{remainingAfterRequest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs font-semibold">
-                      <span className="text-secondary uppercase tracking-wider">Budget Utilization</span>
-                      <span className={utilizationPercentage > 90 ? "text-red-600" : "text-secondary"}>{utilizationPercentage.toFixed(2)}%</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${utilizationColor} transition-all duration-300`} 
-                        style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {budgetExceeded && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex gap-3 items-start animate-in fade-in slide-in-from-top-2">
-                      <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              {loadingBudget ? (
+                <div className="p-8 text-center text-secondary border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <svg className="animate-spin h-8 w-8 mx-auto text-primary mb-2" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="text-sm">Loading budget summary...</p>
+                </div>
+              ) : category ? (
+                categoryBudget ? (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
                       <div>
-                        <p className="text-sm font-bold text-red-800">Budget Exceeded</p>
-                        <p className="text-xs text-red-700 mt-0.5">This Purchase Request exceeds the remaining category budget by <span className="font-bold">₱{(itemsTotal - categoryRemaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.</p>
+                        <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Department</p>
+                        <p className="text-sm font-semibold text-secondary">{user?.department?.name || "Information Technology"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Category</p>
+                        <p className="text-sm font-semibold text-secondary">{categories.find(c => c.id === Number(category))?.name || "Hardware"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Fiscal Year</p>
+                        <p className="text-sm font-semibold text-secondary">FY {prFiscalYear}</p>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
+                      <div>
+                        <p className="text-xs text-secondary font-medium mb-1">Category Budget</p>
+                        <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-secondary font-medium mb-1">Allocated Amount</p>
+                        <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-secondary font-medium mb-1">Current Remaining</p>
+                        <p className="text-base font-bold text-emerald-600">₱{categoryRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-secondary font-medium mb-1">Current Request Total</p>
+                        <p className="text-xl font-extrabold text-primary">₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-secondary font-medium mb-1">Remaining After Request</p>
+                        <p className={`text-xl font-extrabold ${budgetExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
+                          ₱{remainingAfterRequest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs font-semibold">
+                        <span className="text-secondary uppercase tracking-wider">Budget Utilization</span>
+                        <span className={utilizationPercentage > 90 ? "text-red-600" : "text-secondary"}>{utilizationPercentage.toFixed(2)}%</span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${utilizationColor} transition-all duration-300`} 
+                          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {budgetExceeded && (
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex gap-3 items-start animate-in fade-in slide-in-from-top-2">
+                        <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <div>
+                          <p className="text-sm font-bold text-red-800">Budget Exceeded</p>
+                          <p className="text-xs text-red-700 mt-0.5">This Purchase Request exceeds the remaining category budget by <span className="font-bold">₱{(itemsTotal - categoryRemaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-secondary border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                    <svg className="w-8 h-8 mx-auto text-secondary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <p className="text-sm font-semibold">No budget allocated for this category in FY {prFiscalYear}.</p>
+                    <p className="text-xs text-secondary mt-1">Please contact your Department Head or Admin to assign a budget allocation.</p>
+                  </div>
+                )
               ) : (
                 <div className="p-8 text-center text-secondary border border-dashed border-slate-200 rounded-xl bg-slate-50">
                   <svg className="w-8 h-8 mx-auto text-secondary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" /></svg>

@@ -30,6 +30,33 @@ class PurchaseRequestController extends Controller
                 $query->where('status', $request->input('status'));
             }
 
+            // Filter by Fiscal Year
+            if ($request->filled('fiscalYear') || $request->filled('fiscal_year')) {
+                $yearVal = $request->input('fiscalYear', $request->input('fiscal_year'));
+                if ($yearVal !== 'All Fiscal Years' && $yearVal !== '') {
+                    $query->whereRaw(self::getFiscalYearSqlExpression() . " = ?", [(int)$yearVal]);
+                }
+            }
+
+            // Filter by Month
+            if ($request->filled('month')) {
+                $monthVal = $request->input('month');
+                if ($monthVal !== 'All Months' && $monthVal !== '') {
+                    if (is_numeric($monthVal)) {
+                        $query->whereMonth('created_at', (int)$monthVal);
+                    } else {
+                        $monthMap = [
+                            'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4, 'may' => 5, 'june' => 6,
+                            'july' => 7, 'august' => 8, 'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12
+                        ];
+                        $lowerMonth = strtolower($monthVal);
+                        if (isset($monthMap[$lowerMonth])) {
+                            $query->whereMonth('created_at', $monthMap[$lowerMonth]);
+                        }
+                    }
+                }
+            }
+
             // Filter by department (for admins)
             if ($request->filled('department') && (!$user || !$user->isDepartmentHead())) {
                 $department = $request->input('department');
@@ -83,6 +110,33 @@ class PurchaseRequestController extends Controller
 
             if ($user && $user->isDepartmentHead()) {
                 $query->where('department_id', $user->department_id);
+            }
+
+            // Filter by Fiscal Year
+            if ($request->filled('fiscalYear') || $request->filled('fiscal_year')) {
+                $yearVal = $request->input('fiscalYear', $request->input('fiscal_year'));
+                if ($yearVal !== 'All Fiscal Years' && $yearVal !== '') {
+                    $query->whereRaw(self::getFiscalYearSqlExpression() . " = ?", [(int)$yearVal]);
+                }
+            }
+
+            // Filter by Month
+            if ($request->filled('month')) {
+                $monthVal = $request->input('month');
+                if ($monthVal !== 'All Months' && $monthVal !== '') {
+                    if (is_numeric($monthVal)) {
+                        $query->whereMonth('created_at', (int)$monthVal);
+                    } else {
+                        $monthMap = [
+                            'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4, 'may' => 5, 'june' => 6,
+                            'july' => 7, 'august' => 8, 'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12
+                        ];
+                        $lowerMonth = strtolower($monthVal);
+                        if (isset($monthMap[$lowerMonth])) {
+                            $query->whereMonth('created_at', $monthMap[$lowerMonth]);
+                        }
+                    }
+                }
             }
 
             $counts = $query->groupBy('status')
@@ -177,7 +231,7 @@ class PurchaseRequestController extends Controller
                 // Budget validation and reservation
                 if ($pr->department_id) {
                     $budgets = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
-                        ->where('fiscal_year', date('Y'))
+                        ->where('fiscal_year', self::getFiscalYear($pr->created_at))
                         ->orderBy('id', 'asc')
                         ->lockForUpdate()
                         ->get();
@@ -379,7 +433,7 @@ class PurchaseRequestController extends Controller
                     $totalCost = $pr->total_estimated_cost;
                     
                     $primaryBudget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
-                        ->where('fiscal_year', date('Y'))
+                        ->where('fiscal_year', self::getFiscalYear($pr->created_at))
                         ->lockForUpdate()
                         ->first();
 
@@ -433,7 +487,7 @@ class PurchaseRequestController extends Controller
                 if (in_array($newStatus, ['Released', 'Received', 'Completed']) && !in_array($oldStatus, ['Released', 'Received', 'Completed'])) {
                     if ($pr->department_id) {
                         $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
-                            ->where('fiscal_year', date('Y', strtotime($pr->created_at ?? now())))
+                            ->where('fiscal_year', self::getFiscalYear($pr->created_at))
                             ->orderBy('id', 'asc')
                             ->lockForUpdate()
                             ->first();
@@ -641,7 +695,7 @@ class PurchaseRequestController extends Controller
 
     private function generatePrNumber(): string
     {
-        $year = date('Y');
+        $year = self::getFiscalYear(now());
         $prefix = "PR-{$year}-";
 
         $lastPr = PurchaseRequest::where('pr_number', 'like', "{$prefix}%")

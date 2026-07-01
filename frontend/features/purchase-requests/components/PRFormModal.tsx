@@ -16,6 +16,7 @@ export interface PRFormData {
   requestedBy: string;
   notes?: string;
   files?: File[];
+  lineItems?: any[];
 }
 
 interface PRFormModalProps {

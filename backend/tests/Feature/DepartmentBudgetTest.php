@@ -167,10 +167,10 @@ class DepartmentBudgetTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertEquals(6, $response->json('month'));
-        $this->assertEquals(80000.00, $response->json('total_allocated'));
+        $this->assertEquals(130000.00 / 12, $response->json('total_allocated'));
         $this->assertEquals(8000.00, $response->json('total_reserved'));
         $this->assertEquals(20000.00, $response->json('total_spent'));
-        $this->assertEquals(52000.00, $response->json('total_available'));
+        $this->assertEquals((130000.00 / 12) - 8000 - 20000, $response->json('total_available'));
 
         // 2. Check monthly_breakdown structure inside department_summaries
         $summaries = $response->json('department_summaries');
@@ -178,9 +178,9 @@ class DepartmentBudgetTest extends TestCase
         $this->assertCount(12, $summaries[0]['monthly_breakdown']);
         
         $month5Breakdown = collect($summaries[0]['monthly_breakdown'])->firstWhere('month', 5);
-        $this->assertEquals(50000.00, $month5Breakdown['allocated']);
+        $this->assertEquals(130000.00 / 12, $month5Breakdown['allocated']);
 
         $month6Breakdown = collect($summaries[0]['monthly_breakdown'])->firstWhere('month', 6);
-        $this->assertEquals(80000.00, $month6Breakdown['allocated']);
+        $this->assertEquals(130000.00 / 12, $month6Breakdown['allocated']);
     }
 }

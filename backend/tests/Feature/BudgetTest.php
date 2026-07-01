@@ -32,7 +32,7 @@ class BudgetTest extends TestCase
 
         $this->deptBudget = DepartmentBudget::create([
             'department_id' => $this->department->id,
-            'fiscal_year' => now()->year,
+            'fiscal_year' => \App\Http\Controllers\Controller::getFiscalYear(now()),
             'allocated_amount' => 100000.00,
             'reserved_amount' => 10000.00,
             'spent_amount' => 20000.00,

@@ -6,6 +6,8 @@ import StatCard from "@/components/ui/StatCard";
 import { getMyDepartmentBudget, getCategories } from "@/services/budget.service";
 import type { DepartmentBudget, CategoryBudget, Category } from "@/services/budget.service";
 import { AllocateCategoryBudgetModal } from "@/features/categories/components/AllocateCategoryBudgetModal";
+import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
+import { getFiscalYear } from "@/lib/date-utils";
 
 const icons = {
   budget: (
@@ -31,11 +33,17 @@ export default function CategoryBudgetPage() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [filterYear, setFilterYear] = useState<number | "">(getFiscalYear());
+  const [filterMonth, setFilterMonth] = useState<number | null>(null);
+
+  const [annualBudget, setAnnualBudget] = useState<DepartmentBudget | null>(null);
+  const [annualCategoryBudgets, setAnnualCategoryBudgets] = useState<CategoryBudget[]>([]);
+  const [loadingAnnual, setLoadingAnnual] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      getMyDepartmentBudget().catch(() => ({ department_budget: null, category_budgets: [] })),
+      getMyDepartmentBudget(filterYear, filterMonth).catch(() => ({ department_budget: null, category_budgets: [] })),
       getCategories().catch(() => [] as Category[]),
     ]).then(([budgetData, cats]) => {
       setBudget(budgetData.department_budget);
@@ -46,7 +54,23 @@ export default function CategoryBudgetPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filterYear, filterMonth]);
+
+  const handleOpenAllocateModal = () => {
+    if (filterMonth) {
+      setLoadingAnnual(true);
+      getMyDepartmentBudget(filterYear, null)
+        .then((budgetData) => {
+          setAnnualBudget(budgetData.department_budget);
+          setAnnualCategoryBudgets(budgetData.category_budgets);
+          setShowAllocateModal(true);
+        })
+        .catch(console.error)
+        .finally(() => setLoadingAnnual(false));
+    } else {
+      setShowAllocateModal(true);
+    }
+  };
 
   const totalAllocatedToCategories = categoryBudgets.reduce((sum, c) => sum + c.allocated, 0);
   const remainingToAllocate = budget ? budget.allocated - totalAllocatedToCategories : 0;
@@ -59,16 +83,42 @@ export default function CategoryBudgetPage() {
         breadcrumbs={[{ label: "Department Head" }, { label: "Category Budget" }]}
         actions={
           <button
-            onClick={() => setShowAllocateModal(true)}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+            disabled={loadingAnnual}
+            onClick={handleOpenAllocateModal}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all shadow-sm"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Allocate Category Budget
+            {loadingAnnual ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                Loading...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Allocate Category Budget
+              </>
+            )}
           </button>
         }
       />
+
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-secondary/50">
+          Filter Period
+        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <FiscalYearSelector
+            value={filterYear}
+            onChange={setFilterYear}
+            monthValue={filterMonth}
+            onMonthChange={setFilterMonth}
+            label="Fiscal Year"
+          />
+        </div>
+      </div>
 
       {loading ? (
         <div className="p-8 text-center text-secondary/50">Loading budget data...</div>
@@ -103,7 +153,7 @@ export default function CategoryBudgetPage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-secondary">Category Budget Allocations</h3>
-              <span className="text-xs text-secondary/50">FY {budget?.fiscal_year ?? new Date().getFullYear()}</span>
+              <span className="text-xs text-secondary/50">FY {budget?.fiscal_year ?? getFiscalYear()}</span>
             </div>
             <div className="overflow-x-auto">
               {categoryBudgets.length === 0 ? (
@@ -165,9 +215,9 @@ export default function CategoryBudgetPage() {
       {showAllocateModal && (
         <AllocateCategoryBudgetModal
           isOpen={showAllocateModal}
-          departmentBudget={budget}
+          departmentBudget={filterMonth ? annualBudget : budget}
           categories={allCategories}
-          existingAllocations={categoryBudgets}
+          existingAllocations={filterMonth ? annualCategoryBudgets : categoryBudgets}
           onClose={() => setShowAllocateModal(false)}
           onSaved={() => {
             setShowAllocateModal(false);

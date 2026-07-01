@@ -9,6 +9,7 @@ import { getPurchaseRequests } from "@/services/purchase-requests.service";
 import { getMyDepartmentBudget } from "@/services/budget.service";
 import type { PRData } from "@/services/purchase-requests.service";
 import type { DepartmentBudget, CategoryBudget } from "@/services/budget.service";
+import { getFiscalYear } from "@/lib/date-utils";
 
 const icons = {
   budget: (
@@ -108,7 +109,7 @@ export default function DepartmentHeadDashboardPage() {
         <>
           {/* Context Plain Text */}
           <div className="mb-2">
-            <p className="text-base font-bold text-secondary">Fiscal Year {budget?.fiscal_year || new Date().getFullYear()}</p>
+            <p className="text-base font-bold text-secondary">Fiscal Year {budget?.fiscal_year || getFiscalYear()}</p>
           </div>
 
           {/* KPI Grid - Budget */}

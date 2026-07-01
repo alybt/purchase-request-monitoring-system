@@ -11,6 +11,7 @@ import type { PRData } from "@/services/purchase-requests.service";
 import CreatePRModal from "@/features/purchase-requests/components/CreatePRModal";
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
 import StatusConfirmationModal from "@/features/purchase-requests/components/StatusConfirmationModal";
+import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
 
 const STATUS_TABS = ["All", "Draft", "Pending", "Approved", "Rejected", "In Progress", "Released", "Completed"];
 
@@ -27,10 +28,12 @@ export default function DepartmentHeadPRListPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [confirmingReceiptId, setConfirmingReceiptId] = useState<string | null>(null);
+  const [filterYear, setFilterYear] = useState<number | "">("");
+  const [filterMonth, setFilterMonth] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPRs();
-  }, [search]);
+  }, [search, filterYear, filterMonth]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -68,7 +71,7 @@ export default function DepartmentHeadPRListPage() {
     setLoading(true);
     try {
       // Fetch all to get counts, or we could let the backend do it. We fetch all for now.
-      const data = await getPurchaseRequests(search, "", "");
+      const data = await getPurchaseRequests(search, "", "", filterYear, filterMonth);
       setPrs(data);
     } catch (err) {
       console.error(err);
@@ -197,7 +200,7 @@ export default function DepartmentHeadPRListPage() {
         return (
           <div className="flex items-center justify-end gap-2">
             {viewBtn}
-            <button onClick={() => { setConfirmingReceiptId(pr.id.toString()); setConfirmRemarks(""); }} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Confirm Receipt">
+            <button onClick={() => { setConfirmingReceiptId(pr.id.toString()); }} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Confirm Receipt">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             </button>
           </div>
@@ -293,7 +296,7 @@ export default function DepartmentHeadPRListPage() {
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-end justify-between">
           <div className="relative w-full max-w-sm">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -303,9 +306,17 @@ export default function DepartmentHeadPRListPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search PR number, purpose..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm bg-white"
             />
           </div>
+          <FiscalYearSelector
+            value={filterYear}
+            onChange={setFilterYear}
+            monthValue={filterMonth}
+            onMonthChange={setFilterMonth}
+            allowAllYears={true}
+            label="Fiscal Period"
+          />
         </div>
 
         {loading ? (

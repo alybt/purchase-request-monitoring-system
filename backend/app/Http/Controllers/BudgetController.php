@@ -27,9 +27,13 @@ class BudgetController extends Controller
                 ], 200);
             }
 
+            $year = $request->input('fiscal_year', $request->input('fiscalYear', self::getFiscalYear()));
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
+
+            // Fetch all 12 months for the year so we can sum annual allocation correctly
             $budgets = DepartmentBudget::with(['departmentCategoryBudgets.category'])
                 ->where('department_id', $user->department_id)
-                ->where('fiscal_year', now()->year)
+                ->where('fiscal_year', $year)
                 ->get();
 
             if ($budgets->isEmpty()) {
@@ -39,44 +43,55 @@ class BudgetController extends Controller
                 ], 200);
             }
 
-            $totalAllocated = $budgets->sum('allocated_amount');
-            $totalReserved = $budgets->sum('reserved_amount');
-            $totalSpent = $budgets->sum('spent_amount');
-            $availableAmount = floatval($totalAllocated) - floatval($totalReserved) - floatval($totalSpent);
+            $annualDeptAllocated = floatval($budgets->sum('allocated_amount'));
+            $deptAllocated = self::calculateBudgetForPeriod($annualDeptAllocated, $month);
 
-            // Group category budgets by category_id
+            if ($month !== null) {
+                $deptReserved = floatval($budgets->where('month', $month)->sum('reserved_amount'));
+                $deptSpent = floatval($budgets->where('month', $month)->sum('spent_amount'));
+            } else {
+                $deptReserved = floatval($budgets->sum('reserved_amount'));
+                $deptSpent = floatval($budgets->sum('spent_amount'));
+            }
+            $deptAvailable = $deptAllocated - $deptReserved - $deptSpent;
+
+            // Group category budgets by category_id across the whole year to get annual allocations
             $categoryGroups = [];
             foreach ($budgets as $budget) {
                 foreach ($budget->departmentCategoryBudgets as $cb) {
                     $catId = $cb->category_id;
                     if (!isset($categoryGroups[$catId])) {
                         $categoryGroups[$catId] = [
-                            'id' => $catId, // Use category_id as the primary identifier on frontend
+                            'id' => $catId,
                             'category_id' => $catId,
                             'category' => $cb->category?->name ?? 'Unknown',
-                            'allocated' => 0.0,
+                            'annual_allocated' => 0.0,
                             'reserved' => 0.0,
                             'spent' => 0.0,
                         ];
                     }
-                    $categoryGroups[$catId]['allocated'] += floatval($cb->allocated_amount);
-                    $categoryGroups[$catId]['reserved'] += floatval($cb->reserved_amount);
-                    $categoryGroups[$catId]['spent'] += floatval($cb->spent_amount);
+                    $categoryGroups[$catId]['annual_allocated'] += floatval($cb->allocated_amount);
+                    
+                    if ($month === null || $budget->month === $month) {
+                        $categoryGroups[$catId]['reserved'] += floatval($cb->reserved_amount);
+                        $categoryGroups[$catId]['spent'] += floatval($cb->spent_amount);
+                    }
                 }
             }
 
-            $categoryBudgets = collect(array_values($categoryGroups))->map(function ($cb) {
-                $available = $cb['allocated'] - $cb['reserved'] - $cb['spent'];
+            $categoryBudgets = collect(array_values($categoryGroups))->map(function ($cb) use ($month) {
+                $allocated = self::calculateBudgetForPeriod($cb['annual_allocated'], $month);
+                $available = $allocated - $cb['reserved'] - $cb['spent'];
                 return [
                     'id' => $cb['id'],
                     'category_id' => $cb['category_id'],
                     'category' => $cb['category'],
-                    'allocated' => $cb['allocated'],
+                    'allocated' => $allocated,
                     'reserved' => $cb['reserved'],
                     'spent' => $cb['spent'],
                     'available' => $available,
-                    'percentage' => $cb['allocated'] > 0
-                        ? round(($available / $cb['allocated']) * 100, 1)
+                    'percentage' => $allocated > 0
+                        ? round((($cb['reserved'] + $cb['spent']) / $allocated) * 100, 1)
                         : 0,
                 ];
             })->toArray();
@@ -85,10 +100,10 @@ class BudgetController extends Controller
                 'department_budget' => [
                     'id' => $budgets->first()->id, // Return first ID just as a reference
                     'fiscal_year' => $budgets->first()->fiscal_year,
-                    'allocated' => floatval($totalAllocated),
-                    'reserved' => floatval($totalReserved),
-                    'spent' => floatval($totalSpent),
-                    'available' => $availableAmount,
+                    'allocated' => $deptAllocated,
+                    'reserved' => $deptReserved,
+                    'spent' => $deptSpent,
+                    'available' => $deptAvailable,
                 ],
                 'category_budgets' => $categoryBudgets,
             ], 200);
@@ -112,8 +127,12 @@ class BudgetController extends Controller
                 return response()->json(['category_budget' => null], 200);
             }
 
+            $year = $request->input('fiscal_year', $request->input('fiscalYear', self::getFiscalYear()));
+            $month = $request->filled('month') ? (int) $request->input('month') : null;
+
+            // Fetch all 12 months for the year
             $budgets = DepartmentBudget::where('department_id', $user->department_id)
-                ->where('fiscal_year', now()->year)
+                ->where('fiscal_year', $year)
                 ->get();
 
             if ($budgets->isEmpty()) {
@@ -131,20 +150,31 @@ class BudgetController extends Controller
                 return response()->json(['category_budget' => null], 200);
             }
 
-            $totalAllocated = $cbs->sum('allocated_amount');
-            $totalReserved = $cbs->sum('reserved_amount');
-            $totalSpent = $cbs->sum('spent_amount');
+            $annualAllocated = floatval($cbs->sum('allocated_amount'));
+            $allocated = self::calculateBudgetForPeriod($annualAllocated, $month);
 
-            $available = floatval($totalAllocated) - floatval($totalReserved) - floatval($totalSpent);
+            if ($month !== null) {
+                $selectedBudget = $budgets->firstWhere('month', $month);
+                $selectedBudgetId = $selectedBudget ? $selectedBudget->id : null;
+                $selectedCbs = $cbs->where('department_budget_id', $selectedBudgetId);
+                
+                $reserved = floatval($selectedCbs->sum('reserved_amount'));
+                $spent = floatval($selectedCbs->sum('spent_amount'));
+            } else {
+                $reserved = floatval($cbs->sum('reserved_amount'));
+                $spent = floatval($cbs->sum('spent_amount'));
+            }
+
+            $available = $allocated - $reserved - $spent;
 
             return response()->json([
                 'category_budget' => [
                     'id' => $cbs->first()->id, // Return first ID as a reference
                     'category_id' => intval($categoryId),
                     'category' => $cbs->first()->category?->name,
-                    'allocated' => floatval($totalAllocated),
-                    'reserved' => floatval($totalReserved),
-                    'spent' => floatval($totalSpent),
+                    'allocated' => $allocated,
+                    'reserved' => $reserved,
+                    'spent' => $spent,
                     'available' => $available,
                 ],
             ], 200);
