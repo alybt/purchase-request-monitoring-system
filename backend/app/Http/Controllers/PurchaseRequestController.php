@@ -137,7 +137,7 @@ class PurchaseRequestController extends Controller
 
             $request->validate($rules);
 
-            $purchaseRequest = DB::transaction(function () use ($request) {
+            $purchaseRequest = DB::transaction(function () use ($request, $isDraft) {
                 $user = $request->user();
                 $prNumber = $this->generatePrNumber();
 
@@ -146,7 +146,6 @@ class PurchaseRequestController extends Controller
                     'requested_by' => $user->id,
                     'department_id' => $request->input('department_id', $user->department_id),
                     'category_id' => $request->input('category_id'),
-                    'purpose' => $request->input('purpose'),
                     'purpose' => $request->input('purpose'),
                     'status' => $isDraft ? 'Draft' : 'Pending',
                     'total_estimated_cost' => 0.00,
