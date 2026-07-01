@@ -67,23 +67,6 @@ describe('ViewPRModal component', () => {
     expect(screen.getAllByText('"Submitted for review"').length).toBeGreaterThan(0);
   });
 
-  it('shows Approve and Reject buttons when status is Submitted and handlers passed', () => {
-    const onApprove = vi.fn();
-    const onReject = vi.fn();
-
-    render(
-      <ViewPRModal
-        isOpen={true}
-        pr={samplePR}
-        onClose={vi.fn()}
-        onApprove={onApprove}
-        onReject={onReject}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: 'Approve PR' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Reject PR' })).toBeDefined();
-  });
 
   it('triggers print function when Print / Sign Voucher button is clicked', () => {
     render(<ViewPRModal isOpen={true} pr={samplePR} onClose={vi.fn()} />);

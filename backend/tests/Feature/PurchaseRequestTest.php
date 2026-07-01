@@ -57,12 +57,27 @@ class PurchaseRequestTest extends TestCase
             'last_name' => 'Jones',
         ]);
 
+        \App\Models\DepartmentBudget::create([
+            'department_id' => $hrDept->id,
+            'fiscal_year' => date('Y'),
+            'allocated_amount' => 100000.00,
+            'reserved_amount' => 0.00,
+            'spent_amount' => 0.00,
+        ]);
+        \App\Models\DepartmentBudget::create([
+            'department_id' => $opsDept->id,
+            'fiscal_year' => date('Y'),
+            'allocated_amount' => 100000.00,
+            'reserved_amount' => 0.00,
+            'spent_amount' => 0.00,
+        ]);
+
         $this->pr1 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-001',
             'requested_by' => $this->employee1->id,
             'department_id' => $hrDept->id,
             'purpose' => 'Office Supply Upgrades',
-            'status' => 'Submitted',
+            'status' => 'Pending',
             'total_estimated_cost' => 100.00,
         ]);
 
@@ -140,6 +155,7 @@ class PurchaseRequestTest extends TestCase
     public function test_create_purchase_request(): void
     {
         $response = $this->actingAs($this->employee1, 'sanctum')->postJson('/api/purchase-requests', [
+            'purpose' => 'New Projector',
             'purpose_of_requests' => 'New Projector',
             'line_items' => [
                 [
@@ -182,7 +198,7 @@ class PurchaseRequestTest extends TestCase
         $this->assertDatabaseHas('purchase_requests', [
             'purpose' => 'New Projector',
             'total_estimated_cost' => 700.00,
-            'status' => 'Draft',
+            'status' => 'Pending',
         ]);
 
         $this->assertDatabaseHas('purchase_request_items', [

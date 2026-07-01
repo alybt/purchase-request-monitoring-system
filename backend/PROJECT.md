@@ -117,7 +117,7 @@ This document provides a complete guide to the backend architecture, features, A
   * `category_id` (foreign key pointing to `categories.id`, nullable)
   * `purpose` (text - aliased to virtual attribute `purpose_of_requests`)
   * `total_estimated_cost` (decimal, `15, 2`, default `0.00`)
-  * `status` (enum: `'Draft'`, `'Submitted'`, `'Approved'`, `'Rejected'`, `'Ordered'`, `'Received'`, `'Released'`, `'Completed'`)
+  * `status` (enum: `'Draft'`, `'Pending'`, `'Approved'`, `'Rejected'`, `'Ordered'`, `'Received'`, `'Released'`, `'Completed'`)
   * `remarks` (text, nullable)
   * `rejection_reason` (text, nullable)
   * `submitted_at`, `approved_at`, `ordered_at`, `received_at`, `released_at`, `completed_at` (nullable datetime tracking fields)
@@ -221,13 +221,13 @@ All requests except `/api/login` require the `Authorization: Bearer <token>` hea
 * `DELETE /api/purchase-requests/{prId}/attachments/{attachmentId}`: Delete an attachment.
 
 ### Approvals Workflow (`ApprovalController`)
-* `POST /api/purchase-requests/{id}/approve` *(Admin & Department Head only)*: Approve a PR. Updates status to `'Approved'`, inserts status history audit log, and atomically increments `reserved_amount` with `lockForUpdate()` on both `DepartmentBudget` and `DepartmentCategoryBudget`. Prevents self-approval.
-* `POST /api/purchase-requests/{id}/reject` *(Admin & Department Head only)*: Reject a PR. Updates status to `'Rejected'`, inserts audit log, and decrements `reserved_amount` on `DepartmentBudget` and `DepartmentCategoryBudget` if previously reserved. Prevents self-rejection.
+* `POST /api/purchase-requests/{id}/approve` *(Admin & Department Head only)*: Approve a PR currently in `'Pending'` status. Updates status to `'Approved'`, inserts status history audit log, and atomically increments `reserved_amount` with `lockForUpdate()` on both `DepartmentBudget` and `DepartmentCategoryBudget`. Prevents self-approval.
+* `POST /api/purchase-requests/{id}/reject` *(Admin & Department Head only)*: Reject a PR currently in `'Pending'` status. Updates status to `'Rejected'`, inserts audit log, and decrements `reserved_amount` on `DepartmentBudget` and `DepartmentCategoryBudget` if previously reserved. Prevents self-rejection.
 
 ### Dashboard Analytics (`DashboardController`)
 * `GET /api/dashboard/metrics`: Compiles summary statistics (`total_spent`, percentage change vs last month, `bottlenecks` count of requests pending >48 hours, `active_users`, 6-month monthly expenditure history, and department PR/spending breakdown).
 * `GET /api/dashboard/recent-prs`: List of the 5 most recently created PRs.
-* `GET /api/dashboard/pending-approvals`: List of PRs in `'Submitted'` status awaiting approval.
+* `GET /api/dashboard/pending-approvals`: List of PRs in `'Pending'` status awaiting approval.
 
 ---
 

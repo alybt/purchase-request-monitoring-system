@@ -53,13 +53,13 @@ class DashboardTest extends TestCase
         $pr1->created_at = now();
         $pr1->save();
 
-        // Create a bottleneck PR (status Submitted, created > 48 hours ago)
+        // Create a bottleneck PR (status Pending, created > 48 hours ago)
         $pr2 = PurchaseRequest::create([
             'pr_number' => 'PR-2026-002',
             'requested_by' => $this->employee1->id,
             'department_id' => $hrDept->id,
             'purpose' => 'Laptops',
-            'status' => 'Submitted',
+            'status' => 'Pending',
             'total_estimated_cost' => 2000.00,
         ]);
         $pr2->created_at = now()->subDays(3);
@@ -71,7 +71,7 @@ class DashboardTest extends TestCase
             'requested_by' => $this->employee2->id,
             'department_id' => $opsDept->id,
             'purpose' => 'Operations tools',
-            'status' => 'Submitted',
+            'status' => 'Pending',
             'total_estimated_cost' => 150.00,
         ]);
         $pr3->created_at = now();
@@ -89,10 +89,10 @@ class DashboardTest extends TestCase
                 'total_spent_change_percentage',
                 'bottlenecks',
                 'active_users',
-                'monthly_data' => [
+                'category_trends' => [
                     '*' => [
-                        'month',
-                        'spent',
+                        'category',
+                        'count',
                     ]
                 ],
                 'department_breakdown' => [
@@ -156,7 +156,7 @@ class DashboardTest extends TestCase
             ]
         ]);
 
-        // Only PRs with status = 'Submitted' should be returned (PR-2026-002 and PR-2026-003)
+        // Only PRs with status = 'Pending' should be returned (PR-2026-002 and PR-2026-003)
         $response->assertJsonCount(2, 'pending_approvals');
         $response->assertJsonFragment(['pr_number' => 'PR-2026-002']);
         $response->assertJsonFragment(['pr_number' => 'PR-2026-003']);

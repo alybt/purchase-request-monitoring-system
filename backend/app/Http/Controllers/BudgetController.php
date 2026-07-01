@@ -140,7 +140,7 @@ class BudgetController extends Controller
             return response()->json([
                 'category_budget' => [
                     'id' => $cbs->first()->id, // Return first ID as a reference
-                    'category_id' => $categoryId,
+                    'category_id' => intval($categoryId),
                     'category' => $cbs->first()->category?->name,
                     'allocated' => floatval($totalAllocated),
                     'reserved' => floatval($totalReserved),
@@ -209,11 +209,13 @@ class BudgetController extends Controller
 
                 if ($cbs->count() > 0) {
                     // Update the first one with the full amount, zero out the rest
+                    /** @var \App\Models\DepartmentCategoryBudget $firstCb */
                     $firstCb = $cbs->first();
                     $firstCb->allocated_amount = $amount;
                     $firstCb->save();
 
                     foreach ($cbs->slice(1) as $extraCb) {
+                        /** @var \App\Models\DepartmentCategoryBudget $extraCb */
                         $extraCb->allocated_amount = 0;
                         $extraCb->save();
                     }
