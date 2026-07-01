@@ -41,8 +41,8 @@ class DashboardController extends Controller
                 $changePercentage = 100.0;
             }
 
-            // Bottlenecks: Submitted > 48 hours
-            $bottlenecksCount = PurchaseRequest::where('status', 'Submitted')
+            // Bottlenecks: Pending > 48 hours
+            $bottlenecksCount = PurchaseRequest::where('status', 'Pending')
                 ->where('created_at', '<', now()->subHours(48))
                 ->count();
 
@@ -124,7 +124,7 @@ class DashboardController extends Controller
     {
         try {
             $pendingApprovals = PurchaseRequest::with(['requester', 'department', 'category'])
-                ->where('status', 'Submitted')
+                ->where('status', 'Pending')
                 ->orderBy('created_at', 'desc')
                 ->get();
 

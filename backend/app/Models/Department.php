@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
-#[Fillable(['name', 'code', 'description', 'budget_allocation', 'allocation_percentage'])]
+#[Fillable(['name', 'code', 'description', 'budget_allocation', 'allocation_percentage', 'status', 'head_id'])]
 class Department extends Model
 {
     use HasFactory;
@@ -40,5 +40,10 @@ class Department extends Model
     public function departmentHeads()
     {
         return $this->hasMany(User::class)->where('role', 'department_head');
+    }
+
+    public function head()
+    {
+        return $this->belongsTo(User::class, 'head_id');
     }
 }

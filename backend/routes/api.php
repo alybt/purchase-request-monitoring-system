@@ -41,10 +41,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments/{id}/budget-calculations', [DepartmentController::class, 'budgetCalculations']);
 
     // Company Budget (read accessible, mutations restricted to admin)
+    Route::get('/fiscal-years', [CompanyBudgetController::class, 'availableYears']);
     Route::get('/company-budget', [CompanyBudgetController::class, 'index']);
     Route::get('/company-budget/{fiscalYear}', [CompanyBudgetController::class, 'show']);
 
     // Purchase Requests
+    Route::get('/purchase-requests/summary', [PurchaseRequestController::class, 'summary']);
     Route::get('/purchase-requests', [PurchaseRequestController::class, 'index']);
     Route::post('/purchase-requests', [PurchaseRequestController::class, 'store']);
     Route::get('/purchase-requests/{id}', [PurchaseRequestController::class, 'show']);
@@ -57,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Budget
     Route::get('/budget/my-department', [BudgetController::class, 'myDepartmentBudget']);
     Route::get('/budget/category/{categoryId}', [BudgetController::class, 'categoryBudget']);
+    Route::post('/budget/category/allocate', [BudgetController::class, 'bulkAllocateCategoryBudget'])->middleware('role:department_head');
 
     // Dashboard
     Route::get('/dashboard/metrics', [DashboardController::class, 'metrics']);
@@ -73,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/departments', [DepartmentController::class, 'store']);
         Route::put('/departments/{id}', [DepartmentController::class, 'update']);
         Route::put('/departments/{id}/budget', [DepartmentController::class, 'updateBudget']);
+        Route::post('/departments/budget/allocate', [DepartmentController::class, 'bulkAllocateBudget']);
         Route::delete('/departments/{id}/budget', [DepartmentController::class, 'destroyBudget']);
         Route::post('/departments/budget/bulk-delete', [DepartmentController::class, 'bulkDestroyBudget']);
         Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);

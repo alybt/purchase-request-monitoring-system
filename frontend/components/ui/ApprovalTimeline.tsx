@@ -10,7 +10,7 @@ export interface ApprovalEvent {
 }
 
 const actionConfig: Record<string, { color: string; label: string }> = {
-  request: { color: "bg-blue-500", label: "Submitted" },
+  request: { color: "bg-blue-500", label: "Pending" },
   approve: { color: "bg-emerald-500", label: "Approved" },
   reject: { color: "bg-red-500", label: "Rejected" },
   return: { color: "bg-orange-500", label: "Returned" },

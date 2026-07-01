@@ -70,7 +70,7 @@ export default function DepartmentHeadPRDetailPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <PageHeader
         title={pr.prNumber}
-        subtitle={`Submitted ${pr.dateRequested}`}
+        subtitle={`Pending ${pr.dateRequested}`}
         breadcrumbs={[
           { label: "Department Head" },
           { label: "My Purchase Requests", href: "/department-head/purchase-requests" },
@@ -162,7 +162,7 @@ export default function DepartmentHeadPRDetailPage() {
                 pr.status === "Ordered" ? "bg-blue-500" :
                 pr.status === "Received" ? "bg-indigo-500" :
                 pr.status === "Released" ? "bg-purple-500" :
-                pr.status === "Submitted" ? "bg-amber-500" :
+                pr.status === "Pending" ? "bg-amber-500" :
                 "bg-slate-500"
               }`} />
               <div>
@@ -170,7 +170,7 @@ export default function DepartmentHeadPRDetailPage() {
                 <p className="text-xs text-secondary/50">
                   {pr.status === "Draft"
                     ? "Request is being drafted"
-                    : pr.status === "Submitted"
+                    : pr.status === "Pending"
                     ? "Awaiting admin review"
                     : pr.status === "Approved"
                     ? "Approved, ready for procurement"

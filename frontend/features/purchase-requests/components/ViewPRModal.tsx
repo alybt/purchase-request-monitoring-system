@@ -16,8 +16,8 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case "Draft":
       return "bg-slate-100 text-slate-800";
-    case "Submitted":
-      return "bg-yellow-100 text-yellow-800";
+    case "Pending":
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
     case "Approved":
       return "bg-green-100 text-green-800";
     case "Rejected":
@@ -45,6 +45,7 @@ export default function ViewPRModal({
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [localAttachments, setLocalAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (pr?.attachments) {
@@ -140,7 +141,7 @@ export default function ViewPRModal({
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                Status
+                Current Status
               </p>
               <span
                 className={`inline-block px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(pr.status)}`}
@@ -149,6 +150,40 @@ export default function ViewPRModal({
               </span>
             </div>
           </div>
+
+          {/* Procurement Timeline */}
+          {pr.status !== "Rejected" && (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                Procurement Timeline
+              </p>
+              <div className="flex items-center w-full bg-slate-50 p-4 rounded-xl border border-slate-100 overflow-x-auto scrollbar-hide">
+                {["Draft", "Pending", "Approved", "Ordered", "Received", "Released", "Completed"].map((stage, idx, arr) => {
+                  const stageIndex = arr.indexOf(stage);
+                  const currentStageIndex = arr.indexOf(pr.status);
+                  
+                  let isCompleted = stageIndex < currentStageIndex;
+                  let isCurrent = stageIndex === currentStageIndex;
+                  
+                  if (pr.status === "Completed") {
+                    isCompleted = stageIndex <= currentStageIndex;
+                    isCurrent = stage === "Completed";
+                  }
+
+                  return (
+                    <div key={stage} className="flex items-center">
+                      <div className={`flex items-center justify-center px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${isCurrent ? "bg-primary text-white shadow-md ring-2 ring-primary/20" : isCompleted ? "bg-primary/20 text-primary" : "bg-slate-200 text-slate-400"}`}>
+                        {stage}
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className={`w-4 h-0.5 mx-1 rounded-full shrink-0 ${isCompleted && !isCurrent ? "bg-primary/50" : "bg-slate-200"}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Department, Category, and Amount */}
           <div className="grid grid-cols-3 gap-4">
@@ -327,10 +362,31 @@ export default function ViewPRModal({
                     key={att.id}
                     className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 text-xs shadow-sm"
                   >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <svg className="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {att.file_type?.startsWith('image/') || att.file_type?.startsWith('video/') ? (
+                        <div 
+                          className="w-10 h-10 rounded overflow-hidden shrink-0 bg-slate-100 border border-slate-200 cursor-pointer relative group"
+                          onClick={() => setPreviewImage(att.preview_url || null)}
+                          title="Click to preview"
+                        >
+                          {att.file_type?.startsWith('image/') ? (
+                            <img src={att.preview_url} alt={att.file_name} className="w-full h-full object-cover group-hover:opacity-80 transition-opacity" />
+                          ) : (
+                            <video src={att.preview_url} className="w-full h-full object-cover" />
+                          )}
+                          {att.file_type?.startsWith('video/') && (
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded shrink-0 bg-primary/10 flex items-center justify-center text-primary">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                        </div>
+                      )}
                       <div className="truncate">
                         <p className="font-medium text-secondary truncate">{att.file_name}</p>
                         <p className="text-[10px] text-slate-400">
@@ -364,27 +420,38 @@ export default function ViewPRModal({
             </div>
           </div>
 
-          {/* Status History Audit Trail */}
+          {/* Activity History */}
           {pr.statusHistory && pr.statusHistory.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                Status History / Audit Trail
+                Activity History
               </p>
-              <div className="space-y-3 pl-2 border-l-2 border-primary/20">
+              <div className="space-y-4">
                 {pr.statusHistory.map((hist: any, index: number) => (
-                  <div key={hist.id || index} className="relative pl-4">
-                    <div className="absolute -left-[11px] top-1 w-2 h-2 rounded-full bg-primary" />
-                    <div className="flex items-center justify-between text-xs font-semibold text-secondary">
-                      <span className="capitalize">{hist.to_status}</span>
-                      <span className="text-[10px] font-normal text-slate-400">
-                        {hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}
-                      </span>
+                  <div key={hist.id || index} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+                    <p className="font-bold text-primary mb-3 text-base">
+                      {hist.to_status}
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">By:</p>
+                        <p className="text-sm font-medium text-secondary">
+                          {hist.changer ? `${hist.changer.first_name} ${hist.changer.last_name}` : "System User"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Date:</p>
+                        <p className="text-sm font-medium text-secondary">
+                          {hist.created_at ? new Date(hist.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "—"}
+                        </p>
+                      </div>
                     </div>
-                    {hist.remarks && (
-                      <p className="text-xs text-slate-500 mt-0.5 italic">
-                        "{hist.remarks}"
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Remarks:</p>
+                      <p className="text-sm text-secondary/80 bg-slate-50 p-2.5 rounded-lg whitespace-pre-wrap">
+                        {hist.remarks || "No remarks provided."}
                       </p>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -393,28 +460,6 @@ export default function ViewPRModal({
 
           {/* Actions Footer */}
           <div className="pt-4 border-t border-slate-200 flex flex-wrap gap-3">
-            {(pr.status === "Submitted" || pr.status === "pending" || pr.status as string === "Draft") && onApprove && (
-              <button
-                onClick={() => {
-                  const remarks = prompt("Enter approval remarks (optional):", "Approved");
-                  if (remarks !== null) onApprove(pr.id, remarks);
-                }}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1.5"
-              >
-                Approve PR
-              </button>
-            )}
-            {(pr.status === "Submitted" || pr.status === "pending" || pr.status as string === "Draft") && onReject && (
-              <button
-                onClick={() => {
-                  const reason = prompt("Enter rejection reason:", "");
-                  if (reason !== null) onReject(pr.id, reason);
-                }}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-1.5"
-              >
-                Reject PR
-              </button>
-            )}
             <button
               onClick={() => printPurchaseRequest(pr)}
               className="flex-1 bg-slate-100 text-secondary border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
@@ -433,6 +478,26 @@ export default function ViewPRModal({
           </div>
         </div>
       </div>
+
+      {/* Image/Video Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="relative max-w-5xl max-h-[90vh] w-full flex items-center justify-center">
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-12 right-0 text-white hover:text-red-400 transition-colors p-2"
+              title="Close preview"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            {previewImage.endsWith('.mp4') || previewImage.endsWith('.mov') || previewImage.endsWith('.webm') ? (
+              <video src={previewImage} controls autoPlay className="max-w-full max-h-[90vh] rounded-lg shadow-2xl" />
+            ) : (
+              <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

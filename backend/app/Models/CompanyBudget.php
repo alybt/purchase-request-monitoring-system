@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['fiscal_year', 'total_budget', 'allocated_amount'])]
+#[Fillable(['fiscal_year', 'total_budget', 'carry_forward', 'allocated_amount'])]
 class CompanyBudget extends Model
 {
     use HasFactory;

@@ -74,7 +74,7 @@ export default function AdminDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const pendingRequests = prs.filter((pr) => pr.status === "Submitted").length;
+  const pendingRequests = prs.filter((pr) => pr.status === "Pending").length;
   const approvedRequests = prs.filter((pr) => pr.status === "Approved").length;
   const rejectedRequests = prs.filter((pr) => pr.status === "Rejected").length;
 
@@ -93,7 +93,7 @@ export default function AdminDashboardPage() {
   }));
 
   const statusDistribution = [
-    { status: "Submitted", count: pendingRequests, color: "#EAB308" },
+    { status: "Pending", count: pendingRequests, color: "#EAB308" },
     { status: "Approved", count: approvedRequests, color: "#10B981" },
     { status: "Rejected", count: rejectedRequests, color: "#EF4444" },
   ];

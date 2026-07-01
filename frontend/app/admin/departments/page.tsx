@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { DepartmentFormModal, DepartmentViewModal } from "@/features/departments/components/DepartmentModals";
+import { AllocateBudgetModal } from "@/features/departments/components/AllocateBudgetModal";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import FiscalYearSelector from "@/components/ui/FiscalYearSelector";
 
@@ -22,28 +23,27 @@ interface Department {
   name: string;
   code: string;
   description?: string;
+  has_allocation: boolean;
   budget_allocation: number;
   available_budget: number;
   reserved_budget: number;
   spent_budget: number;
+  share: number;
   fiscal_year: number;
+  status: string;
 }
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 export default function DepartmentManagementPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [totalCompanyBudget, setTotalCompanyBudget] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
-  const [filterMonth, setFilterMonth] = useState<number | null>(null);
 
   // Modal states
   const [showAdd, setShowAdd] = useState(false);
+  const [showAllocateBudget, setShowAllocateBudget] = useState(false);
   const [viewDept, setViewDept] = useState<Department | null>(null);
   const [editDept, setEditDept] = useState<Department | null>(null);
 
@@ -57,19 +57,21 @@ export default function DepartmentManagementPage() {
   const fetchDepts = () => {
     setLoading(true);
     const params = new URLSearchParams({ fiscal_year: String(filterYear) });
-    if (filterMonth !== null) params.set("month", String(filterMonth));
     fetch(`${API_URL}/departments?${params.toString()}`, { headers: getHeaders() })
       .then((r) => r.json())
-      .then((data) => setDepartments(data.departments || []))
+      .then((data) => {
+        setDepartments(data.departments || []);
+        setTotalCompanyBudget(data.total_company_budget || 0);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchDepts();
-  }, [filterYear, filterMonth]);
+  }, [filterYear]);
 
-  const handleCreateDept = async (form: { name: string; code: string; description: string }) => {
+  const handleCreateDept = async (form: { name: string; code: string; description: string; status: string }) => {
     const res = await fetch(`${API_URL}/departments`, {
       method: "POST",
       headers: getHeaders(),
@@ -81,7 +83,7 @@ export default function DepartmentManagementPage() {
     fetchDepts();
   };
 
-  const handleUpdateDept = async (form: { name: string; code: string; description: string }) => {
+  const handleUpdateDept = async (form: { name: string; code: string; description: string; status: string }) => {
     if (!editDept) return;
     const res = await fetch(`${API_URL}/departments/${editDept.id}`, {
       method: "PUT",
@@ -146,7 +148,8 @@ export default function DepartmentManagementPage() {
     }
   };
 
-  const totalAllocated = departments.reduce((s, d) => s + d.budget_allocation, 0);
+  const totalAllocated = departments.reduce((s, d) => s + (d.budget_allocation || 0), 0);
+  const totalDeptRemaining = departments.reduce((s, d) => s + (d.available_budget || 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -157,16 +160,28 @@ export default function DepartmentManagementPage() {
         actions={
           <div className="flex items-center gap-2">
             {!isDeleteMode && (
-              <button
-                id="add-department-btn"
-                onClick={() => setShowAdd(true)}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Department
-              </button>
+              <>
+                <button
+                  id="add-department-btn"
+                  onClick={() => setShowAdd(true)}
+                  className="flex items-center gap-2 bg-white border border-slate-200 text-secondary px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Department
+                </button>
+                <button
+                  id="allocate-budget-btn"
+                  onClick={() => setShowAllocateBudget(true)}
+                  className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Allocate Budget
+                </button>
+              </>
             )}
           </div>
         }
@@ -187,27 +202,6 @@ export default function DepartmentManagementPage() {
             onChange={setFilterYear}
             label="Fiscal Year"
           />
-
-          {/* Month filter */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-secondary/60">Month</span>
-            <select
-              value={filterMonth === null ? "all" : filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value === "all" ? null : Number(e.target.value))}
-              className="px-3 py-2 text-xs font-bold text-secondary bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="all">All Months</option>
-              {MONTH_NAMES.map((name, idx) => (
-                <option key={idx + 1} value={idx + 1}>{name}</option>
-              ))}
-            </select>
-          </div>
-
-          {filterMonth !== null && (
-            <span className="self-end inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/60">
-              {MONTH_NAMES[filterMonth - 1]} {filterYear}
-            </span>
-          )}
         </div>
       </div>
 
@@ -215,10 +209,7 @@ export default function DepartmentManagementPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
         <div className="px-6 py-4 border-b border-slate-100">
           <h3 className="text-base font-bold text-secondary">
-            Departments
-            {filterMonth !== null
-              ? ` — ${MONTH_NAMES[filterMonth - 1]} ${filterYear}`
-              : ` — FY ${filterYear}`}
+            Departments — FY {filterYear}
           </h3>
         </div>
         <div className="overflow-x-auto">
@@ -240,10 +231,12 @@ export default function DepartmentManagementPage() {
                       />
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left">Department</th>
-                  <th className="px-6 py-3 text-left">Code</th>
-                  <th className="px-6 py-3 text-left">Allocated</th>
-                  <th className="px-6 py-3 text-left">Available</th>
+                  <th className="px-6 py-3 text-left">Department Name</th>
+                  <th className="px-6 py-3 text-left">Department Code</th>
+                  <th className="px-6 py-3 text-left">Department Allocation</th>
+                  <th className="px-6 py-3 text-left w-24">Share (%)</th>
+                  <th className="px-6 py-3 text-left">Remaining Department Budget</th>
+                  <th className="px-6 py-3 text-left w-24">Status</th>
                   <th className="px-6 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {!isDeleteMode ? (
@@ -290,14 +283,30 @@ export default function DepartmentManagementPage() {
                     <td className="px-6 py-3 font-semibold text-secondary">{dept.name}</td>
                     <td className="px-6 py-3 font-mono text-secondary/70">{dept.code}</td>
                     <td className="px-6 py-3 font-semibold text-secondary">
-                      {dept.budget_allocation > 0
-                        ? `₱${dept.budget_allocation.toLocaleString()}`
-                        : <span className="text-secondary/40">Not set</span>}
+                      {dept.has_allocation
+                        ? `₱${dept.budget_allocation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                        : <span className="text-secondary/40 font-normal italic">Not Allocated</span>}
                     </td>
-                    <td className="px-6 py-3 text-emerald-600 font-semibold">
-                      {dept.budget_allocation > 0
-                        ? `₱${dept.available_budget.toLocaleString()}`
-                        : "—"}
+                    <td className="px-6 py-3 font-semibold text-secondary/70">
+                      {dept.has_allocation ? `${dept.share.toFixed(2)}%` : <span className="text-secondary/40 font-normal italic">—</span>}
+                    </td>
+                    <td className="px-6 py-3 font-semibold">
+                      {dept.has_allocation ? (
+                        <span className={dept.available_budget < 0 ? "text-red-600" : "text-emerald-600"}>
+                          ₱{dept.available_budget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </span>
+                      ) : (
+                        <span className="text-secondary/40 italic">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        dept.status === 'active' 
+                          ? 'bg-emerald-100 text-emerald-800' 
+                          : 'bg-slate-100 text-slate-800'
+                      }`}>
+                        {dept.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
                     </td>
                     <td className="px-6 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -338,13 +347,36 @@ export default function DepartmentManagementPage() {
                   </tr>
                 ))}
               </tbody>
-              {totalAllocated > 0 && (
+              {(totalCompanyBudget > 0 || totalAllocated > 0) && (
                 <tfoot>
-                  <tr className="border-t border-slate-200 bg-slate-50">
+                  <tr className="border-t-2 border-slate-200 bg-slate-50">
                     {isDeleteMode && <td />}
-                    <td className="px-6 py-3 font-bold text-secondary">Total</td>
-                    <td />
-                    <td className="px-6 py-3 font-bold text-secondary">₱{totalAllocated.toLocaleString()}</td>
+                    <td className="px-6 py-2.5 font-bold text-secondary" colSpan={2}>Total Allocated</td>
+                    <td className="px-6 py-2.5 font-bold text-secondary">₱{totalAllocated.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td className="px-6 py-2.5 font-bold text-secondary/70">
+                      {(totalCompanyBudget > 0 ? (totalAllocated / totalCompanyBudget) * 100 : 0).toFixed(2)}%
+                    </td>
+                    <td className="px-6 py-2.5 font-bold text-secondary">₱{totalDeptRemaining.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td colSpan={2} />
+                  </tr>
+                  <tr className="bg-slate-50 border-t border-slate-100">
+                    {isDeleteMode && <td />}
+                    <td className="px-6 py-2.5 font-bold text-secondary" colSpan={2}>Total Company Budget</td>
+                    <td className="px-6 py-2.5 font-bold text-primary">₱{totalCompanyBudget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td className="px-6 py-2.5 font-bold text-primary">
+                      {totalCompanyBudget > 0 ? "100.00%" : "0.00%"}
+                    </td>
+                    <td className="px-6 py-2.5 font-bold text-primary">₱{totalAllocated.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td colSpan={2} />
+                  </tr>
+                  <tr className="bg-slate-50 border-t border-slate-100">
+                    {isDeleteMode && <td />}
+                    <td className="px-6 py-2.5 font-bold text-secondary" colSpan={2}>Remaining Unallocated</td>
+                    <td className="px-6 py-2.5 font-bold text-accent">₱{Math.max(0, totalCompanyBudget - totalAllocated).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td className="px-6 py-2.5 font-bold text-accent">
+                      {(totalCompanyBudget > 0 ? (Math.max(0, totalCompanyBudget - totalAllocated) / totalCompanyBudget) * 100 : 0).toFixed(2)}%
+                    </td>
+                    <td className="px-6 py-2.5 font-bold text-accent">₱{Math.max(0, totalAllocated - totalDeptRemaining).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>
@@ -395,6 +427,16 @@ export default function DepartmentManagementPage() {
           }
         }}
         onConfirm={handleConfirmDelete}
+      />
+
+      <AllocateBudgetModal
+        isOpen={showAllocateBudget}
+        fiscalYear={filterYear}
+        departments={departments}
+        onClose={() => setShowAllocateBudget(false)}
+        onSaved={() => {
+          fetchDepts();
+        }}
       />
     </div>
   );

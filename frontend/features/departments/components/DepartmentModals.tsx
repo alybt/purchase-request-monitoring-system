@@ -18,7 +18,7 @@ interface DepartmentFormModalProps {
   isEditMode: boolean;
   initialData?: Department | null;
   onClose: () => void;
-  onSubmit: (data: { name: string; code: string; description: string }) => Promise<void>;
+  onSubmit: (data: { name: string; code: string; description: string; status: string }) => Promise<void>;
 }
 
 export function DepartmentFormModal({
@@ -28,7 +28,7 @@ export function DepartmentFormModal({
   onClose,
   onSubmit,
 }: DepartmentFormModalProps) {
-  const emptyForm = { name: "", code: "", description: "" };
+  const emptyForm = { name: "", code: "", description: "", status: "active" };
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -38,7 +38,7 @@ export function DepartmentFormModal({
     if (!isOpen) return;
     setForm(
       initialData
-        ? { name: initialData.name, code: initialData.code, description: initialData.description || "" }
+        ? { name: initialData.name, code: initialData.code, description: initialData.description || "", status: (initialData as any).status || "active" }
         : emptyForm
     );
     setErrors({});
@@ -133,6 +133,24 @@ export function DepartmentFormModal({
                   placeholder="Optional"
                 />
               </div>
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-semibold text-secondary mb-2">Department Head</label>
+                <select disabled className={`${inputNormal} bg-slate-50 cursor-not-allowed`}>
+                  <option>Not Assigned</option>
+                </select>
+                <p className="text-xs text-secondary/50 mt-1">Managed via User Administration</p>
+              </div>
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-semibold text-secondary mb-2">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                  className={inputNormal}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -174,6 +192,7 @@ export function DepartmentViewModal({ isOpen, department, onClose, onEdit }: Dep
     { label: "Department Name", value: department.name },
     { label: "Department Code", value: department.code },
     { label: "Description", value: department.description || "—" },
+    { label: "Status", value: (department as any).status === 'active' ? 'Active' : 'Inactive' },
     {
       label: "Budget Allocation",
       value: department.budget_allocation

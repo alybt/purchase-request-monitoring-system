@@ -16,15 +16,21 @@ class PurchaseRequestController extends Controller
     public function index(Request $request)
     {
         try {
+            $user = $request->user();
             $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory', 'attachments']);
+
+            // Restrict Department Head to their own department's PRs
+            if ($user && $user->isDepartmentHead()) {
+                $query->where('department_id', $user->department_id);
+            }
 
             // Filter by status
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
 
-            // Filter by department
-            if ($request->filled('department')) {
+            // Filter by department (for admins)
+            if ($request->filled('department') && (!$user || !$user->isDepartmentHead())) {
                 $department = $request->input('department');
                 $query->whereHas('department', function ($q) use ($department) {
                     $q->where('name', $department)->orWhere('code', $department);
@@ -68,6 +74,39 @@ class PurchaseRequestController extends Controller
         }
     }
 
+    public function summary(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $query = PurchaseRequest::select('status', DB::raw('count(*) as count'));
+
+            if ($user && $user->isDepartmentHead()) {
+                $query->where('department_id', $user->department_id);
+            }
+
+            $counts = $query->groupBy('status')
+                ->get()
+                ->pluck('count', 'status')
+                ->toArray();
+
+            $statuses = ['Draft', 'Pending', 'Approved', 'Rejected', 'Ordered', 'Received', 'Released', 'Completed'];
+            $result = [];
+            foreach ($statuses as $status) {
+                $result[$status] = $counts[$status] ?? 0;
+            }
+
+            return response()->json(['counts' => $result], 200);
+        } catch (\Throwable $e) {
+            Log::error('Get purchase requests summary failure: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'An unexpected error occurred. Please try again later.'
+            ], 500);
+        }
+    }
+
     public function store(Request $request)
     {
         try {
@@ -75,17 +114,28 @@ class PurchaseRequestController extends Controller
                 $request->merge(['purpose' => $request->input('purpose_of_requests')]);
             }
 
-            $request->validate([
-                'purpose' => 'required|string',
+            $isDraft = $request->input('status') === 'Draft';
+
+            $rules = [
+                'purpose' => $isDraft ? 'nullable|string' : 'required|string',
                 'department_id' => 'nullable|integer|exists:departments,id',
                 'category_id' => 'nullable|integer|exists:categories,id',
-                'line_items' => 'required|array|min:1',
-                'line_items.*.item_name' => 'required|string|max:255',
-                'line_items.*.description' => 'nullable|string',
-                'line_items.*.quantity' => 'required|integer|min:1',
-                'line_items.*.unit_price' => 'required|numeric|min:0',
-                'line_items.*.vendor' => 'nullable|string|max:255',
-            ]);
+                'status' => 'nullable|string'
+            ];
+
+            if (!$isDraft) {
+                $rules['line_items'] = 'required|array|min:1';
+                $rules['line_items.*.item_name'] = 'required|string|max:255';
+                $rules['line_items.*.quantity'] = 'required|integer|min:1';
+                $rules['line_items.*.unit_price'] = 'required|numeric|min:0';
+            } else {
+                $rules['line_items'] = 'nullable|array';
+                $rules['line_items.*.item_name'] = 'nullable|string|max:255';
+                $rules['line_items.*.quantity'] = 'nullable|integer|min:0';
+                $rules['line_items.*.unit_price'] = 'nullable|numeric|min:0';
+            }
+
+            $request->validate($rules);
 
             $purchaseRequest = DB::transaction(function () use ($request) {
                 $user = $request->user();
@@ -97,33 +147,80 @@ class PurchaseRequestController extends Controller
                     'department_id' => $request->input('department_id', $user->department_id),
                     'category_id' => $request->input('category_id'),
                     'purpose' => $request->input('purpose'),
-                    'status' => 'Draft',
+                    'purpose' => $request->input('purpose'),
+                    'status' => $isDraft ? 'Draft' : 'Pending',
                     'total_estimated_cost' => 0.00,
                 ]);
 
                 $totalCost = 0;
-                foreach ($request->input('line_items') as $item) {
-                    $totalPrice = $item['quantity'] * $item['unit_price'];
-                    $totalCost += $totalPrice;
+                if ($request->has('line_items') && is_array($request->input('line_items'))) {
+                    foreach ($request->input('line_items') as $item) {
+                        if (empty($item['item_name'])) continue;
+                        $quantity = $item['quantity'] ?? 0;
+                        $unitPrice = $item['unit_price'] ?? 0;
+                        $totalPrice = $quantity * $unitPrice;
+                        $totalCost += $totalPrice;
 
-                    $pr->items()->create([
-                        'item_name' => $item['item_name'],
-                        'description' => $item['description'] ?? null,
-                        'quantity' => $item['quantity'],
-                        'unit_price' => $item['unit_price'],
-                        'total_price' => $totalPrice,
-                        'vendor' => $item['vendor'] ?? null,
-                    ]);
+                        $pr->items()->create([
+                            'item_name' => $item['item_name'],
+                            'description' => $item['description'] ?? null,
+                            'quantity' => $quantity,
+                            'unit_price' => $unitPrice,
+                            'total_price' => $totalPrice,
+                            'vendor' => $item['vendor'] ?? null,
+                        ]);
+                    }
                 }
 
                 $pr->update(['total_estimated_cost' => $totalCost]);
 
+                // Budget validation and reservation
+                if ($pr->department_id) {
+                    $budgets = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
+                        ->where('fiscal_year', date('Y'))
+                        ->orderBy('id', 'asc')
+                        ->lockForUpdate()
+                        ->get();
+                        
+                    if ($budgets->isEmpty()) {
+                        throw new \Exception("Department budget not found for current fiscal year.");
+                    }
+
+                    $deptAvailable = $budgets->sum('allocated_amount') - ($budgets->sum('reserved_amount') + $budgets->sum('spent_amount'));
+                    $primaryBudget = $budgets->first();
+
+                    if ($pr->category_id) {
+                        $catBudgets = \App\Models\DepartmentCategoryBudget::whereIn('department_budget_id', $budgets->pluck('id'))
+                            ->where('category_id', $pr->category_id)
+                            ->lockForUpdate()
+                            ->get();
+
+                        if ($catBudgets->isEmpty()) {
+                            throw new \Exception("Category budget not found.");
+                        }
+
+                        $catAvailable = $catBudgets->sum('allocated_amount') - ($catBudgets->sum('reserved_amount') + $catBudgets->sum('spent_amount'));
+
+                        if ($totalCost > $catAvailable) {
+                            throw new \Exception("Insufficient category budget. Available: ₱" . number_format($catAvailable, 2));
+                        }
+
+                        $catBudgets->first()->increment('reserved_amount', $totalCost);
+                    } else {
+                        if ($totalCost > $deptAvailable) {
+                            throw new \Exception("Insufficient department budget. Available: ₱" . number_format($deptAvailable, 2));
+                        }
+                    }
+
+                    $primaryBudget->increment('reserved_amount', $totalCost);
+                }
+
                 PurchaseRequestStatusHistory::create([
                     'purchase_request_id' => $pr->id,
                     'from_status' => null,
-                    'to_status' => $pr->status,
+                    'to_status' => $isDraft ? 'Draft' : 'Pending',
                     'changed_by' => $user->id,
-                    'remarks' => 'Purchase request created',
+                    'remarks' => $isDraft ? 'Draft created.' : 'Purchase Request pending approval.',
                 ]);
 
                 return $pr;
@@ -187,19 +284,30 @@ class PurchaseRequestController extends Controller
                 $request->merge(['purpose' => $request->input('purpose_of_requests')]);
             }
 
-            $request->validate([
-                'purpose' => 'sometimes|required|string',
+            $isDraft = $request->input('status') === 'Draft';
+
+            $rules = [
+                'purpose' => 'nullable|string',
                 'status' => 'nullable|string',
                 'remarks' => 'nullable|string',
                 'department_id' => 'nullable|integer|exists:departments,id',
                 'category_id' => 'nullable|integer|exists:categories,id',
-                'line_items' => 'sometimes|required|array|min:1',
-                'line_items.*.item_name' => 'required|string|max:255',
-                'line_items.*.description' => 'nullable|string',
-                'line_items.*.quantity' => 'required|integer|min:1',
-                'line_items.*.unit_price' => 'required|numeric|min:0',
-                'line_items.*.vendor' => 'nullable|string|max:255',
-            ]);
+            ];
+
+            if (!$isDraft && $request->has('status') && $request->input('status') !== 'Draft') {
+                $rules['purpose'] = 'sometimes|required|string';
+                $rules['line_items'] = 'sometimes|required|array|min:1';
+                $rules['line_items.*.item_name'] = 'required|string|max:255';
+                $rules['line_items.*.quantity'] = 'required|integer|min:1';
+                $rules['line_items.*.unit_price'] = 'required|numeric|min:0';
+            } else {
+                $rules['line_items'] = 'nullable|array';
+                $rules['line_items.*.item_name'] = 'nullable|string|max:255';
+                $rules['line_items.*.quantity'] = 'nullable|integer|min:0';
+                $rules['line_items.*.unit_price'] = 'nullable|numeric|min:0';
+            }
+
+            $request->validate($rules);
 
             $oldStatus = $pr->status;
             DB::transaction(function () use ($request, $pr, $oldStatus) {
@@ -208,7 +316,14 @@ class PurchaseRequestController extends Controller
                 if ($request->has('status')) {
                     $st = $request->input('status');
                     if ($st === 'Approve') $st = 'Approved';
-                    if ($st === 'Request') $st = 'Submitted';
+                    if ($st === 'Request') $st = 'Pending';
+                    
+                    if ($st === 'Completed' && $oldStatus !== 'Completed') {
+                        if (!$request->user() || !$request->user()->isDepartmentHead()) {
+                            throw new \Exception("Only Department Heads can confirm receipt and mark a purchase request as Completed.");
+                        }
+                    }
+                    
                     $updateData['status'] = $st;
                 }
                 if ($request->has('remarks')) $updateData['remarks'] = $request->input('remarks');
@@ -221,24 +336,69 @@ class PurchaseRequestController extends Controller
                     $pr->items()->delete();
 
                     $totalCost = 0;
-                    foreach ($request->input('line_items') as $item) {
-                        $totalPrice = $item['quantity'] * $item['unit_price'];
-                        $totalCost += $totalPrice;
+                    if (is_array($request->input('line_items'))) {
+                        foreach ($request->input('line_items') as $item) {
+                            if (empty($item['item_name'])) continue;
+                            $quantity = $item['quantity'] ?? 0;
+                            $unitPrice = $item['unit_price'] ?? 0;
+                            $totalPrice = $quantity * $unitPrice;
+                            $totalCost += $totalPrice;
 
-                        $pr->items()->create([
-                            'item_name' => $item['item_name'],
-                            'description' => $item['description'] ?? null,
-                            'quantity' => $item['quantity'],
-                            'unit_price' => $item['unit_price'],
-                            'total_price' => $totalPrice,
-                            'vendor' => $item['vendor'] ?? null,
-                        ]);
+                            $pr->items()->create([
+                                'item_name' => $item['item_name'],
+                                'description' => $item['description'] ?? null,
+                                'quantity' => $quantity,
+                                'unit_price' => $unitPrice,
+                                'total_price' => $totalPrice,
+                                'vendor' => $item['vendor'] ?? null,
+                            ]);
+                        }
                     }
 
                     $pr->update(['total_estimated_cost' => $totalCost]);
                 }
 
                 $newStatus = $pr->status;
+
+                if ($newStatus === 'Pending' && in_array($oldStatus, ['Draft', 'Rejected'])) {
+                    $totalCost = $pr->total_estimated_cost;
+                    
+                    $primaryBudget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
+                        ->where('fiscal_year', date('Y'))
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$primaryBudget) {
+                        throw new \Exception("Department budget not found for the current fiscal year.");
+                    }
+
+                    $deptAvailable = $primaryBudget->allocated_amount - ($primaryBudget->reserved_amount + $primaryBudget->spent_amount);
+
+                    if ($pr->category_id) {
+                        $catBudgets = \App\Models\DepartmentCategoryBudget::where('department_budget_id', $primaryBudget->id)
+                            ->where('category_id', $pr->category_id)
+                            ->lockForUpdate()
+                            ->get();
+
+                        if ($catBudgets->isEmpty()) {
+                            throw new \Exception("Category budget not found.");
+                        }
+
+                        $catAvailable = $catBudgets->sum('allocated_amount') - ($catBudgets->sum('reserved_amount') + $catBudgets->sum('spent_amount'));
+
+                        if ($totalCost > $catAvailable) {
+                            throw new \Exception("Insufficient category budget. Available: ₱" . number_format($catAvailable, 2));
+                        }
+
+                        $catBudgets->first()->increment('reserved_amount', $totalCost);
+                    } else {
+                        if ($totalCost > $deptAvailable) {
+                            throw new \Exception("Insufficient department budget. Available: ₱" . number_format($deptAvailable, 2));
+                        }
+                    }
+
+                    $primaryBudget->increment('reserved_amount', $totalCost);
+                }
                 if ($newStatus !== $oldStatus) {
                     PurchaseRequestStatusHistory::create([
                         'purchase_request_id' => $pr->id,
@@ -253,7 +413,7 @@ class PurchaseRequestController extends Controller
                     if ($pr->department_id) {
                         $budget = \App\Models\DepartmentBudget::where('department_id', $pr->department_id)
                             ->where('fiscal_year', date('Y', strtotime($pr->created_at ?? now())))
-                            ->where('month', date('n', strtotime($pr->created_at ?? now())))
+                            ->orderBy('id', 'asc')
                             ->lockForUpdate()
                             ->first();
                         if ($budget) {
@@ -367,7 +527,7 @@ class PurchaseRequestController extends Controller
 
             foreach ($request->file('files') as $file) {
                 $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('purchase-requests/' . $pr->id, $fileName, 'local');
+                $filePath = $file->storeAs('purchase-requests/' . $pr->id, $fileName, 'public');
 
                 $attachment = $pr->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
@@ -407,11 +567,11 @@ class PurchaseRequestController extends Controller
                 ->where('id', $attachmentId)
                 ->first();
 
-            if (!$attachment || !\Illuminate\Support\Facades\Storage::disk('local')->exists($attachment->file_path)) {
+            if (!$attachment || !\Illuminate\Support\Facades\Storage::disk('public')->exists($attachment->file_path)) {
                 return response()->json(['message' => 'Attachment file not found.'], 404);
             }
 
-            $absolutePath = \Illuminate\Support\Facades\Storage::disk('local')->path($attachment->file_path);
+            $absolutePath = \Illuminate\Support\Facades\Storage::disk('public')->path($attachment->file_path);
             return response()->download(
                 $absolutePath,
                 $attachment->file_name,
@@ -437,8 +597,8 @@ class PurchaseRequestController extends Controller
                 return response()->json(['message' => 'Attachment not found.'], 404);
             }
 
-            if (\Illuminate\Support\Facades\Storage::disk('local')->exists($attachment->file_path)) {
-                \Illuminate\Support\Facades\Storage::disk('local')->delete($attachment->file_path);
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($attachment->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($attachment->file_path);
             }
 
             $attachment->delete();

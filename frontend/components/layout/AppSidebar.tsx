@@ -64,7 +64,9 @@ export default function AppSidebar({ menuItems, role }: SidebarProps) {
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
             <span className={`text-xs font-medium ${colors.label} whitespace-nowrap`}>
-              {roleTitles[role]}
+              {role === "department_head" && typeof window !== "undefined" && localStorage.getItem("user") 
+                ? `${JSON.parse(localStorage.getItem("user") || "{}").department?.name || "Department"} Head` 
+                : roleTitles[role]}
             </span>
           </div>
         </div>

@@ -32,6 +32,7 @@ export interface Attachment {
   };
   created_at?: string;
   download_url?: string;
+  preview_url?: string;
 }
 
 export interface StatusHistoryItem {
@@ -56,7 +57,7 @@ export interface PRData {
   category?: string;
   categoryId?: number;
   amount: number;
-  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed" | "pending" | string;
+  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Ordered" | "Received" | "Released" | "Completed" | "pending" | string;
   requestedBy: string;
   dateRequested: string;
   dueDate: string;
@@ -100,7 +101,10 @@ export function mapBackendPRToFrontend(pr: any): PRData {
     notes: pr.remarks || pr.notes || "",
     lineItems: pr.items || pr.line_items || pr.purchase_request_items || [],
     statusHistory: pr.status_history || pr.statusHistory || [],
-    attachments: pr.attachments || [],
+    attachments: (pr.attachments || []).map((att: any) => ({
+      ...att,
+      preview_url: att.file_path ? `http://127.0.0.1:8000/storage/${att.file_path}` : undefined
+    })),
   };
 }
 
@@ -124,6 +128,21 @@ export async function getPurchaseRequests(search = "", department = "", status =
   return (data.purchase_requests || []).map(mapBackendPRToFrontend);
 }
 
+export async function getPurchaseRequestsSummary(): Promise<Record<string, number>> {
+  const response = await fetch(`${API_URL}/purchase-requests/summary`, {
+    method: "GET",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to fetch purchase requests summary");
+  }
+
+  const data = await response.json();
+  return data.counts || {};
+}
+
 export async function getPurchaseRequestDetails(id: string): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "GET",
@@ -139,7 +158,7 @@ export async function getPurchaseRequestDetails(id: string): Promise<PRData> {
   return mapBackendPRToFrontend(data.purchase_request);
 }
 
-export async function createPurchaseRequest(data: { description: string; amount: number; category_id?: number; lineItems?: LineItem[] }): Promise<PRData> {
+export async function createPurchaseRequest(data: { description: string; amount: number; category_id?: number; lineItems?: LineItem[]; status?: string }): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests`, {
     method: "POST",
     headers: getHeaders(),
@@ -147,6 +166,7 @@ export async function createPurchaseRequest(data: { description: string; amount:
       purpose_of_requests: data.description,
       purpose: data.description,
       category_id: data.category_id || null,
+      status: data.status,
       line_items: data.lineItems && data.lineItems.length > 0 ? data.lineItems : [
         {
           item_name: data.description.substring(0, 50) || "General Purchase Item",
@@ -197,6 +217,25 @@ export async function updatePurchaseRequest(id: string, data: { description: str
   return mapBackendPRToFrontend(resData.purchase_request);
 }
 
+export async function updatePurchaseRequestStatus(id: string, status: string, remarks?: string): Promise<PRData> {
+  const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify({
+      status,
+      remarks,
+    }),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.message || "Failed to update purchase request status");
+  }
+
+  const resData = await response.json();
+  return mapBackendPRToFrontend(resData.purchase_request);
+}
+
 export async function deletePurchaseRequest(id: string): Promise<void> {
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "DELETE",
@@ -221,6 +260,30 @@ export async function bulkDeletePurchaseRequests(ids: string[]): Promise<void> {
   if (!response.ok) {
     const errData = await response.json();
     throw new Error(errData.message || "Failed to delete purchase requests");
+  }
+}
+
+export async function approvePurchaseRequest(id: string, comments?: string): Promise<void> {
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/approve`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ comments: comments || "" }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to approve purchase request");
+  }
+}
+
+export async function rejectPurchaseRequest(id: string, comments?: string): Promise<void> {
+  const response = await fetch(`${API_URL}/purchase-requests/${id}/reject`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ comments: comments || "" }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Failed to reject purchase request");
   }
 }
 
