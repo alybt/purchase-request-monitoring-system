@@ -39,7 +39,10 @@ To run the automated test suite:
 npm test
 ```
 
-### Covered Architecture Layer (`services/` & `lib/`)
+### Covered Architecture Layers (`services/`, `lib/`, & `components/`)
+* **UI Components (`features/.../components/`)**:
+  * `PRFormModal.tsx`: Tested modal rendering modes (Create vs Edit), required field validation guards (`amount > 0`, description, requestedBy, dueDate), category dropdown loading, and clean submission payload formatting.
+  * `ViewPRModal.tsx`: Tested PR data presentation (PR Number, status badge, department, amount), line items table display, supporting attachments list, audit trail timeline rendering, and voucher print button triggering.
 * **Services (`services/`)**:
   * `auth.service.ts`: Login, logout, session user retrieval (`/me`), and password changes.
   * `budget.service.ts`: Category budgets, department budget summaries, monthly allocation breakdowns, and company budget upserts.
