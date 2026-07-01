@@ -140,7 +140,7 @@ class BudgetController extends Controller
             return response()->json([
                 'category_budget' => [
                     'id' => $cbs->first()->id, // Return first ID as a reference
-                    'category_id' => $categoryId,
+                    'category_id' => intval($categoryId),
                     'category' => $cbs->first()->category?->name,
                     'allocated' => floatval($totalAllocated),
                     'reserved' => floatval($totalReserved),
