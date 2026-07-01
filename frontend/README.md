@@ -29,6 +29,30 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Testing & Verification
+
+We use [Vitest](https://vitest.dev/) along with jsdom for comprehensive unit testing of frontend services and utility helpers.
+
+To run the automated test suite:
+
+```bash
+npm test
+```
+
+### Covered Architecture Layer (`services/` & `lib/`)
+* **Services (`services/`)**:
+  * `auth.service.ts`: Login, logout, session user retrieval (`/me`), and password changes.
+  * `budget.service.ts`: Category budgets, department budget summaries, monthly allocation breakdowns, and company budget upserts.
+  * `dashboard.service.ts`: Dashboard metric KPIs and recent purchase request synchronization.
+  * `purchase-requests.service.ts`: PR schema mappers (`purpose`, `items`, `requester`), filtering, CRUD actions, bulk deletions, and attachment management.
+  * `users.service.ts`: User list queries, RBAC role mapping, status transformations, and bulk actions.
+* **Libraries (`lib/`)**:
+  * `auth-utils.ts`: LocalStorage token management, role extraction, display name formatting, and role-based redirect paths.
+  * `print.ts`: Voucher and budget allocation printable report generation inside hidden DOM iframes.
+  * `api.ts`: Base login request wrapper.
+
+---
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
