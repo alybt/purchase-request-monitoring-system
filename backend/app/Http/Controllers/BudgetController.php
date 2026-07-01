@@ -239,15 +239,13 @@ class BudgetController extends Controller
 
                 if ($cbs->count() > 0) {
                     // Update the first one with the full amount, zero out the rest
-                    /** @var \App\Models\DepartmentCategoryBudget $firstCb */
+                    /** @var DepartmentCategoryBudget $firstCb */
                     $firstCb = $cbs->first();
-                    $firstCb->allocated_amount = $amount;
-                    $firstCb->save();
+                    $firstCb->update(['allocated_amount' => $amount]);
 
                     foreach ($cbs->slice(1) as $extraCb) {
-                        /** @var \App\Models\DepartmentCategoryBudget $extraCb */
-                        $extraCb->allocated_amount = 0;
-                        $extraCb->save();
+                        /** @var DepartmentCategoryBudget $extraCb */
+                        $extraCb->update(['allocated_amount' => 0]);
                     }
                 } else {
                     // Create new on the primary department budget
