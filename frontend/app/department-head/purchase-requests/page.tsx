@@ -10,6 +10,7 @@ import type { PRData } from "@/services/purchase-requests.service";
 
 import CreatePRModal from "@/features/purchase-requests/components/CreatePRModal";
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
+import StatusConfirmationModal from "@/features/purchase-requests/components/StatusConfirmationModal";
 
 const STATUS_TABS = ["All", "Draft", "Pending", "Approved", "Rejected", "In Progress", "Released", "Completed"];
 
@@ -26,12 +27,24 @@ export default function DepartmentHeadPRListPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [confirmingReceiptId, setConfirmingReceiptId] = useState<string | null>(null);
-  const [confirmRemarks, setConfirmRemarks] = useState("");
-  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     fetchPRs();
   }, [search]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const prIdParam = urlParams.get('prId');
+      if (prIdParam) {
+        setViewingPrId(prIdParam);
+        
+        // Remove the parameter from URL to prevent reopening on reload
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [prs]);
 
   useEffect(() => {
     // Calculate tab counts
@@ -103,19 +116,16 @@ export default function DepartmentHeadPRListPage() {
     }
   };
 
-  const handleConfirmReceipt = async () => {
+  const handleConfirmReceipt = async (remarks: string) => {
     if (!confirmingReceiptId) return;
-    setIsConfirming(true);
     try {
-      await updatePurchaseRequestStatus(confirmingReceiptId, "Completed", confirmRemarks);
+      await updatePurchaseRequestStatus(confirmingReceiptId, "Completed", remarks);
       setConfirmingReceiptId(null);
-      setConfirmRemarks("");
       fetchPRs();
     } catch (error) {
       console.error("Failed to confirm receipt", error);
       alert("Failed to confirm receipt.");
-    } finally {
-      setIsConfirming(false);
+      throw error;
     }
   };
 
@@ -134,11 +144,25 @@ export default function DepartmentHeadPRListPage() {
             <button onClick={() => { setEditingPrId(pr.id.toString()); setShowCreateModal(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Edit">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             </button>
-            <button className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Submit">
+            <button onClick={async () => {
+              if (confirm('Are you sure you want to submit this draft for approval?')) {
+                try {
+                  await updatePurchaseRequestStatus(pr.id.toString(), "Pending", "Submitted for approval");
+                  fetchPRs();
+                } catch (e) { alert("Failed to submit request."); }
+              }
+            }} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Submit">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             </button>
             {!isDeleteMode && (
-              <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Delete">
+              <button onClick={async () => {
+                if (confirm('Are you sure you want to delete this draft?')) {
+                  try {
+                    await bulkDeletePurchaseRequests([pr.id.toString()]);
+                    fetchPRs();
+                  } catch (e) { alert("Failed to delete request."); }
+                }
+              }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Delete">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </button>
             )}
@@ -148,7 +172,14 @@ export default function DepartmentHeadPRListPage() {
         return (
           <div className="flex items-center justify-end gap-2">
             {viewBtn}
-            <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Cancel">
+            <button onClick={async () => {
+              if (confirm('Are you sure you want to cancel this request and return it to Draft status?')) {
+                try {
+                  await updatePurchaseRequestStatus(pr.id.toString(), "Draft", "Cancelled by requester");
+                  fetchPRs();
+                } catch (e) { alert("Failed to cancel request."); }
+              }
+            }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-semibold text-xs inline-flex items-center gap-1.5" title="Cancel">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
@@ -361,62 +392,18 @@ export default function DepartmentHeadPRListPage() {
         <ViewPRModal
           isOpen={!!viewingPrId}
           onClose={() => setViewingPrId(null)}
-          prId={viewingPrId}
-          onStatusChange={fetchPRs}
+          pr={prs.find(p => p.id.toString() === viewingPrId) || null}
         />
       )}
 
       {/* Confirm Receipt Modal */}
       {confirmingReceiptId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
-              <div className="p-3 bg-teal-100 text-teal-600 rounded-xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-secondary">Confirm Receipt</h2>
-                <p className="text-sm text-slate-500 mt-1">Please confirm that your department has received all requested items.</p>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-secondary mb-2">Remarks <span className="text-slate-400 font-normal">(Optional)</span></label>
-                <textarea
-                  value={confirmRemarks}
-                  onChange={(e) => setConfirmRemarks(e.target.value)}
-                  placeholder="Add an optional acknowledgement..."
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm h-32 resize-none"
-                  maxLength={500}
-                />
-                <div className="text-right text-xs text-slate-400 mt-1">Characters: {confirmRemarks.length} / 500</div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button
-                onClick={() => { setConfirmingReceiptId(null); setConfirmRemarks(""); }}
-                className="px-6 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-colors"
-                disabled={isConfirming}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmReceipt}
-                disabled={isConfirming}
-                className="px-6 py-2.5 text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:hover:bg-teal-600 rounded-xl transition-colors shadow-sm flex items-center gap-2"
-              >
-                {isConfirming ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Confirming...
-                  </>
-                ) : (
-                  "Confirm Receipt"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <StatusConfirmationModal
+          isOpen={!!confirmingReceiptId}
+          action="Completed"
+          onClose={() => setConfirmingReceiptId(null)}
+          onConfirm={handleConfirmReceipt}
+        />
       )}
     </div>
   );

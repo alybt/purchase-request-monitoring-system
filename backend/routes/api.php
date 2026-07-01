@@ -55,6 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/purchase-requests/{id}/attachments', [PurchaseRequestController::class, 'uploadAttachments']);
     Route::get('/purchase-requests/{prId}/attachments/{attachmentId}/download', [PurchaseRequestController::class, 'downloadAttachment']);
     Route::delete('/purchase-requests/{prId}/attachments/{attachmentId}', [PurchaseRequestController::class, 'deleteAttachment']);
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    Route::patch('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
 
     // Budget
     Route::get('/budget/my-department', [BudgetController::class, 'myDepartmentBudget']);

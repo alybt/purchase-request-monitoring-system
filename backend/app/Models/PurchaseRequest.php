@@ -24,7 +24,12 @@ use Illuminate\Database\Eloquent\Model;
     'ordered_at',
     'received_at',
     'released_at',
-    'completed_at'
+    'completed_at',
+    'supplier_name',
+    'purchase_order_number',
+    'expected_delivery_date',
+    'procurement_remarks',
+    'ordered_by'
 ])]
 class PurchaseRequest extends Model
 {
@@ -38,6 +43,7 @@ class PurchaseRequest extends Model
         'received_at' => 'datetime',
         'released_at' => 'datetime',
         'completed_at' => 'datetime',
+        'expected_delivery_date' => 'date',
     ];
 
     public function department()
@@ -58,6 +64,11 @@ class PurchaseRequest extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function orderer()
+    {
+        return $this->belongsTo(User::class, 'ordered_by');
     }
 
     public function items()

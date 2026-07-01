@@ -3,32 +3,69 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getUserDisplayName, getStoredUser, StoredUser } from "@/lib/auth-utils";
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, AppNotification } from "@/services/notifications.service";
 
 interface AppTopbarProps {
   pageTitle?: string;
   role?: "admin" | "department_head";
 }
 
-const notifications = [
-  { id: "n1", text: "PR-2026-001 is awaiting your approval", time: "5m ago", unread: true },
-  { id: "n2", text: "PR-2026-004 has been completed", time: "1h ago", unread: true },
-  { id: "n3", text: "New user Ana Reyes registered", time: "3h ago", unread: false },
-];
-
 export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     setUser(getStoredUser());
+    fetchNotifications();
+    
+    // Poll notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await getNotifications();
+      setNotifications(data.notifications);
+      setUnreadCount(data.unread_count);
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    }
+  };
+
+  const handleNotificationClick = async (notif: AppNotification) => {
+    if (!notif.is_read) {
+      try {
+        await markNotificationAsRead(notif.id);
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      } catch (e) { console.error(e); }
+    }
+    
+    setShowNotifications(false);
+    
+    // Redirect to PR details
+    if (notif.purchase_request_id) {
+      const basePath = role === "admin" ? "/admin/pr-management" : "/department-head/purchase-requests";
+      router.push(`${basePath}?prId=${notif.purchase_request_id}`);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (e) { console.error(e); }
+  };
 
   const displayName = getUserDisplayName(user);
   const initial = displayName.charAt(0).toUpperCase();
-  const unreadCount = notifications.filter((n) => n.unread).length;
 
   const handleLogout = async () => {
     try {
@@ -46,6 +83,16 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
     label: seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
     href: "/" + segments.slice(0, i + 1).join("/"),
   }));
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -76,22 +123,32 @@ export default function AppTopbar({ pageTitle, role }: AppTopbarProps) {
               </svg>
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
             {showNotifications && (
               <div className="absolute right-0 top-11 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100">
+                <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
                   <p className="text-sm font-bold text-secondary">Notifications</p>
+                  {unreadCount > 0 && (
+                    <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline">
+                      Mark all as read
+                    </button>
+                  )}
                 </div>
                 <ul className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                  {notifications.map((n) => (
-                    <li key={n.id} className={`px-4 py-3 hover:bg-slate-50 cursor-pointer ${n.unread ? "bg-primary/5" : ""}`}>
-                      <p className="text-sm text-secondary">{n.text}</p>
-                      <p className="text-xs text-secondary/50 mt-0.5">{n.time}</p>
-                    </li>
-                  ))}
+                  {notifications.length === 0 ? (
+                    <li className="px-4 py-6 text-center text-sm text-slate-500">No notifications</li>
+                  ) : (
+                    notifications.map((n) => (
+                      <li key={n.id} onClick={() => handleNotificationClick(n)} className={`px-4 py-3 hover:bg-slate-50 cursor-pointer ${!n.is_read ? "bg-primary/5" : ""}`}>
+                        <p className={`text-sm ${!n.is_read ? 'font-bold' : ''} text-secondary`}>{n.title}</p>
+                        <p className="text-xs text-secondary/70 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-secondary/50 mt-1">{timeAgo(n.created_at)}</p>
+                      </li>
+                    ))
+                  )}
                 </ul>
               </div>
             )}

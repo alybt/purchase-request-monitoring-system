@@ -78,19 +78,19 @@ export default function AdminDashboardPage() {
   const approvedRequests = prs.filter((pr) => pr.status === "Approved").length;
   const rejectedRequests = prs.filter((pr) => pr.status === "Rejected").length;
 
-  // Calculate monthly trend
-  const monthCounts: Record<string, number> = {};
-  prs.forEach(pr => {
-    const d = new Date(pr.dateRequested);
-    if (!isNaN(d.getTime())) {
-      const month = d.toLocaleString('default', { month: 'short' });
-      monthCounts[month] = (monthCounts[month] || 0) + 1;
-    }
+  // Calculate Purchase Request Trends by Category
+  const categoryCounts: Record<string, number> = {};
+  prs.filter(pr => pr.status !== "Draft").forEach(pr => {
+    const categoryName = pr.category || "Uncategorized";
+    categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
   });
-  const monthlyTrend = Object.keys(monthCounts).map(month => ({
-    label: month,
-    value: monthCounts[month],
-  }));
+
+  const categoryTrend = Object.keys(categoryCounts)
+    .map(category => ({
+      label: category,
+      value: categoryCounts[category] || 0,
+    }))
+    .sort((a, b) => b.value - a.value);
 
   const statusDistribution = [
     { status: "Pending", count: pendingRequests, color: "#EAB308" },
@@ -127,8 +127,8 @@ export default function AdminDashboardPage() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <BarChart
-              title="Monthly Procurement Trends"
-              data={monthlyTrend}
+              title="Purchase Request Trends by Category"
+              data={categoryTrend}
               color="#408E61"
             />
             <StatusDistribution

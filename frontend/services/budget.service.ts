@@ -45,6 +45,7 @@ export async function getCategories(): Promise<Category[]> {
   const response = await fetch(`${API_URL}/categories`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -60,6 +61,7 @@ export async function getMyDepartmentBudget(): Promise<DepartmentBudgetResponse>
   const response = await fetch(`${API_URL}/budget/my-department`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -74,6 +76,7 @@ export async function getCategoryBudget(categoryId: number): Promise<CategoryBud
   const response = await fetch(`${API_URL}/budget/category/${categoryId}`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {

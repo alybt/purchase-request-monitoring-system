@@ -125,7 +125,7 @@ export default function PRFormModal({
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-secondary transition-colors"
+            className="text-secondary hover:text-secondary transition-colors"
           >
             <svg
               className="w-6 h-6"
@@ -157,7 +157,7 @@ export default function PRFormModal({
                   type="text"
                   value={formData.prNumber}
                   disabled
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-secondary/70 cursor-not-allowed"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 cursor-not-allowed text-black placeholder:text-black"
                 />
               </div>
             )}
@@ -172,7 +172,7 @@ export default function PRFormModal({
                   name="department"
                   value={formData.department}
                   onChange={handleChange}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-black placeholder:text-black"
                 >
                   {departments.map((dept) => (
                     <option key={dept} value={dept}>
@@ -194,7 +194,7 @@ export default function PRFormModal({
                   name="category_id"
                   value={formData.category_id || ""}
                   onChange={handleChange}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-black placeholder:text-black"
                 >
                   <option value="">Select Category (Optional)</option>
                   {categories.map((cat) => (
@@ -216,10 +216,7 @@ export default function PRFormModal({
                   value={formData.amount || ""}
                   onChange={handleChange}
                   placeholder="0"
-                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.amount
-                      ? "border-red-500 focus:ring-red-500/50"
-                      : "border-slate-200 focus:ring-primary/50"
-                    }`}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 text-black placeholder:text-black ${errors.amount ? "border-red-500 focus:ring-red-500/50" : "border-slate-200 focus:ring-primary/50" }`}
                 />
                 {errors.amount && (
                   <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
@@ -238,10 +235,7 @@ export default function PRFormModal({
                 onChange={handleChange}
                 placeholder="Enter purchase request description"
                 rows={3}
-                className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 resize-none ${errors.description
-                    ? "border-red-500 focus:ring-red-500/50"
-                    : "border-slate-200 focus:ring-primary/50"
-                  }`}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none text-black placeholder:text-black ${errors.description ? "border-red-500 focus:ring-red-500/50" : "border-slate-200 focus:ring-primary/50" }`}
               />
               {errors.description && (
                 <p className="text-red-500 text-xs mt-1">{errors.description}</p>
@@ -260,10 +254,7 @@ export default function PRFormModal({
                   value={formData.requestedBy}
                   onChange={handleChange}
                   placeholder="Enter name"
-                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.requestedBy
-                      ? "border-red-500 focus:ring-red-500/50"
-                      : "border-slate-200 focus:ring-primary/50"
-                    }`}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 text-black placeholder:text-black ${errors.requestedBy ? "border-red-500 focus:ring-red-500/50" : "border-slate-200 focus:ring-primary/50" }`}
                 />
                 {errors.requestedBy && (
                   <p className="text-red-500 text-xs mt-1">
@@ -282,10 +273,7 @@ export default function PRFormModal({
                   name="dueDate"
                   value={formData.dueDate}
                   onChange={handleChange}
-                  className={`w-full border rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 ${errors.dueDate
-                      ? "border-red-500 focus:ring-red-500/50"
-                      : "border-slate-200 focus:ring-primary/50"
-                    }`}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 text-black placeholder:text-black ${errors.dueDate ? "border-red-500 focus:ring-red-500/50" : "border-slate-200 focus:ring-primary/50" }`}
                 />
                 {errors.dueDate && (
                   <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>
@@ -302,7 +290,7 @@ export default function PRFormModal({
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-secondary"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-black placeholder:text-black"
               >
                 <option value="Pending">Pending</option>
                 <option value="Approved">Approved</option>
@@ -325,7 +313,7 @@ export default function PRFormModal({
                 onChange={handleChange}
                 placeholder="Add any additional notes"
                 rows={2}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none text-black placeholder:text-black"
               />
             </div>
 
@@ -345,10 +333,10 @@ export default function PRFormModal({
                     });
                   }
                 }}
-                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-slate-200 rounded-lg p-1.5"
+                className="w-full text-xs text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-slate-200 rounded-lg p-1.5"
               />
               {formData.files && formData.files.length > 0 && (
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-secondary mt-1">
                   Selected {formData.files.length} file(s): {formData.files.map(f => f.name).join(", ")}
                 </p>
               )}
@@ -362,7 +350,7 @@ export default function PRFormModal({
                 </label>
                 <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-secondary">
                       <tr>
                         <th className="px-3 py-2 font-medium">Item</th>
                         <th className="px-3 py-2 font-medium">Qty</th>
@@ -375,8 +363,8 @@ export default function PRFormModal({
                         <tr key={idx} className="border-b border-slate-100 last:border-b-0 text-secondary">
                           <td className="px-3 py-2 font-medium">{item.item_name}</td>
                           <td className="px-3 py-2">{item.quantity}</td>
-                          <td className="px-3 py-2">₱{Number(item.unit_price).toLocaleString()}</td>
-                          <td className="px-3 py-2 font-semibold">₱{(item.quantity * item.unit_price).toLocaleString()}</td>
+                          <td className="px-3 py-2">₱{Number(item.unit_price || 0).toLocaleString()}</td>
+                          <td className="px-3 py-2 font-semibold">₱{Number(item.total_price || (item.quantity * item.unit_price) || 0).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>

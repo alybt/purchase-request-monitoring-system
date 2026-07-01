@@ -49,20 +49,24 @@ class DashboardController extends Controller
             // Active Users
             $activeUsersCount = User::where('status', 'active')->count();
 
-            // Monthly expenditure for last 6 months
-            $monthlyData = [];
-            for ($i = 5; $i >= 0; $i--) {
-                $date = now()->subMonths($i);
-                $spent = PurchaseRequest::whereIn('status', ['Approved', 'Ordered', 'Received', 'Released', 'Completed'])
-                    ->whereMonth('created_at', $date->month)
-                    ->whereYear('created_at', $date->year)
-                    ->sum('total_estimated_cost');
-
-                $monthlyData[] = [
-                    'month' => $date->format('F'),
-                    'spent' => floatval($spent),
-                ];
-            }
+            // Purchase Request Trends by Category
+            $categoryTrends = DB::table('purchase_requests')
+                ->join('categories', 'purchase_requests.category_id', '=', 'categories.id')
+                ->select(
+                    'categories.name as category',
+                    DB::raw('count(purchase_requests.id) as count')
+                )
+                ->where('purchase_requests.status', '!=', 'Draft')
+                ->whereNotNull('purchase_requests.category_id')
+                ->groupBy('categories.id', 'categories.name')
+                ->orderBy('count', 'desc')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'category' => $item->category,
+                        'count' => intval($item->count),
+                    ];
+                });
 
             // Department breakdown using the new schema
             $departmentBreakdown = DB::table('purchase_requests')
@@ -89,7 +93,7 @@ class DashboardController extends Controller
                     'total_spent_change_percentage' => round($changePercentage, 1),
                     'bottlenecks' => $bottlenecksCount,
                     'active_users' => $activeUsersCount,
-                    'monthly_data' => $monthlyData,
+                    'category_trends' => $categoryTrends,
                     'department_breakdown' => $departmentBreakdown,
                 ]
             ], 200);

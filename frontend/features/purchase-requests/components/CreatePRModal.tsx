@@ -37,6 +37,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitting = isSavingDraft || isSubmitting;
   const [isPending, setIsPending] = useState(false);
+  const [submittedStatus, setSubmittedStatus] = useState<'Draft' | 'Pending' | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<any>(null);
@@ -66,6 +67,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
       setItems([defaultItem()]);
       setAttachments([]);
       setIsPending(false);
+      setSubmittedStatus(null);
       setError("");
       setPrStatus(null);
       setRejectionRemarks(null);
@@ -207,6 +209,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
         await uploadPRAttachments(prId, attachments);
       }
 
+      setSubmittedStatus(status);
       setIsPending(true);
     } catch (err: any) {
       console.error(err);
@@ -228,14 +231,18 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-extrabold text-secondary mb-2">Request Pending Approval!</h2>
-          <p className="text-secondary/60 text-sm mb-6">
-            Your purchase request has been submitted and is pending approval. You will be notified once a decision is made.
+          <h2 className="text-2xl font-extrabold text-secondary mb-2">
+            {submittedStatus === 'Draft' ? 'Draft saved successfully.' : 'Request Pending Approval!'}
+          </h2>
+          <p className="text-secondary text-sm mb-6">
+            {submittedStatus === 'Draft' 
+              ? 'Purchase request saved as draft successfully. This request has not been submitted yet and is only visible to you until you submit it for approval.'
+              : 'Your purchase request has been submitted and is pending approval. You will be notified once a decision is made.'}
           </p>
           <div className="bg-slate-50 rounded-xl p-4 text-left mb-6 border border-slate-100">
-            <p className="text-xs text-secondary/50 font-semibold uppercase mb-1">Total Request Amount</p>
+            <p className="text-xs text-secondary font-semibold uppercase mb-1">Total Request Amount</p>
             <p className="text-2xl font-extrabold text-primary">₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <p className="text-xs text-secondary/50 mt-1">{items.length} item{items.length > 1 ? "s" : ""} · {categories.find(c => c.id === Number(category))?.name}</p>
+            <p className="text-xs text-secondary mt-1">{items.length} item{items.length > 1 ? "s" : ""} · {categories.find(c => c.id === Number(category))?.name}</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -279,7 +286,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
           <h1 className="text-xl font-black text-secondary tracking-tight">
             {prIdToEdit ? (prStatus === "Rejected" ? "Edit & Resubmit Purchase Request" : "Edit Purchase Request") : "Create Purchase Request"}
           </h1>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+          <button onClick={onClose} className="p-2 text-secondary hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -329,7 +336,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                     type="text" 
                     value={user?.department?.name || "Information Technology"} 
                     disabled 
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-secondary bg-slate-50 cursor-not-allowed"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 cursor-not-allowed text-black placeholder:text-gray-600"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -338,7 +345,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     required
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white text-black placeholder:text-gray-600"
                   >
                     <option value="" disabled>Select category</option>
                     {categories.map((c) => (
@@ -353,122 +360,16 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                     onChange={(e) => setPurpose(e.target.value)}
                     rows={2}
                     placeholder="Describe the reason and objective of this purchase request..."
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none bg-white"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none bg-white text-black placeholder:text-gray-600"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Section 2: Items */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-bold text-secondary flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">2</span>
-                  Items
-                </h2>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-primary border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white hover:border-primary transition-all"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Item
-                </button>
-              </div>
-
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                    <tr>
-                      <th className="px-4 py-3 w-1/4">Item Name</th>
-                      <th className="px-4 py-3 w-1/4">Description</th>
-                      <th className="px-4 py-3 w-24">Quantity</th>
-                      <th className="px-4 py-3 w-32">Unit Cost</th>
-                      <th className="px-4 py-3 w-32 text-right">Line Total</th>
-                      <th className="px-4 py-3 w-12 text-center"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {items.map((item) => (
-                      <tr key={item.id} className="bg-white hover:bg-slate-50/50">
-                        <td className="p-2">
-                          <input
-                            type="text"
-                            value={item.itemName}
-                            onChange={(e) => updateItem(item.id, "itemName", e.target.value)}
-                            placeholder="Item name"
-                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                            placeholder="Optional details"
-                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            type="number"
-                            value={item.quantity || ""}
-                            onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                            min={1}
-                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">₱</span>
-                            <input
-                              type="number"
-                              value={item.estimatedCost || ""}
-                              onChange={(e) => updateItem(item.id, "estimatedCost", e.target.value)}
-                              min={0}
-                              className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:border-primary"
-                            />
-                          </div>
-                        </td>
-                        <td className="p-4 text-right font-bold text-secondary">
-                          ₱{((item.quantity || 0) * (item.estimatedCost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            disabled={items.length === 1}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50 border-t border-slate-200">
-                    <tr>
-                      <td colSpan={4} className="px-4 py-3 text-right font-semibold text-slate-500 uppercase text-xs tracking-wider">
-                        Items Total
-                      </td>
-                      <td className="px-4 py-3 text-right font-extrabold text-primary text-base">
-                        ₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            {/* Section 3: Budget Summary */}
+            {/* Section 2: Budget Summary */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 shrink-0">
               <h2 className="text-base font-bold text-secondary mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">3</span>
+                <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">2</span>
                 Budget Summary
               </h2>
               
@@ -476,41 +377,41 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                 <div className="space-y-5">
                   <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Department</p>
+                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Department</p>
                       <p className="text-sm font-semibold text-secondary">{user?.department?.name || "Information Technology"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Category</p>
+                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Category</p>
                       <p className="text-sm font-semibold text-secondary">{categories.find(c => c.id === Number(category))?.name || "Hardware"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Fiscal Year</p>
+                      <p className="text-xs text-secondary font-medium uppercase tracking-wider mb-1">Fiscal Year</p>
                       <p className="text-sm font-semibold text-secondary">FY {new Date().getFullYear()}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-100">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium mb-1">Category Budget</p>
+                      <p className="text-xs text-secondary font-medium mb-1">Category Budget</p>
                       <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium mb-1">Allocated Amount</p>
+                      <p className="text-xs text-secondary font-medium mb-1">Allocated Amount</p>
                       <p className="text-base font-bold text-secondary">₱{categoryBudget.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium mb-1">Current Remaining</p>
+                      <p className="text-xs text-secondary font-medium mb-1">Current Remaining</p>
                       <p className="text-base font-bold text-emerald-600">₱{categoryRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium mb-1">Current Request Total</p>
+                      <p className="text-xs text-secondary font-medium mb-1">Current Request Total</p>
                       <p className="text-xl font-extrabold text-primary">₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium mb-1">Remaining After Request</p>
+                      <p className="text-xs text-secondary font-medium mb-1">Remaining After Request</p>
                       <p className={`text-xl font-extrabold ${budgetExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
                         ₱{remainingAfterRequest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
@@ -519,7 +420,7 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs font-semibold">
-                      <span className="text-slate-500 uppercase tracking-wider">Budget Utilization</span>
+                      <span className="text-secondary uppercase tracking-wider">Budget Utilization</span>
                       <span className={utilizationPercentage > 90 ? "text-red-600" : "text-secondary"}>{utilizationPercentage.toFixed(2)}%</span>
                     </div>
                     <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -541,18 +442,124 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                   )}
                 </div>
               ) : (
-                <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl bg-slate-50">
-                  <svg className="w-8 h-8 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" /></svg>
+                <div className="p-8 text-center text-secondary border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <svg className="w-8 h-8 mx-auto text-secondary mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" /></svg>
                   <p className="text-sm">Please select a category to view budget summary.</p>
                 </div>
               )}
+            </div>
+
+            {/* Section 3: Items */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-bold text-secondary flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">3</span>
+                  Items
+                </h2>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-primary border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white hover:border-primary transition-all"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Item
+                </button>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs text-secondary uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th className="px-4 py-3 w-1/4">Item Name</th>
+                      <th className="px-4 py-3 w-1/4">Description</th>
+                      <th className="px-4 py-3 w-24">Quantity</th>
+                      <th className="px-4 py-3 w-32">Unit Cost</th>
+                      <th className="px-4 py-3 w-32 text-right">Line Total</th>
+                      <th className="px-4 py-3 w-12 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {items.map((item) => (
+                      <tr key={item.id} className="bg-white hover:bg-slate-50/50">
+                        <td className="p-2">
+                          <input
+                            type="text"
+                            value={item.itemName}
+                            onChange={(e) => updateItem(item.id, "itemName", e.target.value)}
+                            placeholder="Item name"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary text-black placeholder:text-gray-600"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                            placeholder="Optional details"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary text-black placeholder:text-gray-600"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            value={item.quantity || ""}
+                            onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
+                            min={1}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary text-black placeholder:text-gray-600"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-secondary">₱</span>
+                            <input
+                              type="number"
+                              value={item.estimatedCost || ""}
+                              onChange={(e) => updateItem(item.id, "estimatedCost", e.target.value)}
+                              min={0}
+                              className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:border-primary text-black placeholder:text-gray-600"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-4 text-right font-bold text-secondary">
+                          ₱{((item.quantity || 0) * (item.estimatedCost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.id)}
+                            disabled={items.length === 1}
+                            className="p-1.5 text-secondary hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t border-slate-200">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-3 text-right font-semibold text-secondary uppercase text-xs tracking-wider">
+                        Items Total
+                      </td>
+                      <td className="px-4 py-3 text-right font-extrabold text-primary text-base">
+                        ₱{itemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
             {/* Section 4: Attachments */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <h2 className="text-base font-bold text-secondary mb-4 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">4</span>
-                Attachments <span className="text-slate-400 font-normal text-sm">(Optional)</span>
+                Attachments <span className="text-secondary font-normal text-sm">(Optional)</span>
               </h2>
 
               <div
@@ -564,12 +571,12 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                   isDragOver ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/40 hover:bg-slate-50"
                 }`}
               >
-                <svg className="w-10 h-10 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-10 h-10 mx-auto text-secondary mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p className="text-sm font-semibold text-slate-500">Drop files here or <span className="text-primary">browse</span></p>
-                <p className="text-xs text-slate-400 mt-1">PDF, Word, Excel, Images up to 10MB</p>
-                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+                <p className="text-sm font-semibold text-secondary">Drop files here or <span className="text-primary">browse</span></p>
+                <p className="text-xs text-secondary mt-1">PDF, Word, Excel, Images up to 10MB</p>
+                <input ref={fileInputRef} type="file" multiple className="hidden text-black placeholder:text-gray-600" onChange={handleFileSelect} />
               </div>
 
               {attachments.length > 0 && (
@@ -580,11 +587,11 @@ export default function CreatePRModal({ isOpen, onClose, onCreated, prIdToEdit }
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                       </svg>
                       <span className="text-sm text-secondary flex-1 truncate font-medium">{file.name}</span>
-                      <span className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</span>
+                      <span className="text-xs text-secondary">{(file.size / 1024).toFixed(0)} KB</span>
                       <button
                         type="button"
                         onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
+                        className="text-secondary hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

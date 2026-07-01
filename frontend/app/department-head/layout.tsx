@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppSidebar from "@/components/layout/AppSidebar";
 import AppTopbar from "@/components/layout/AppTopbar";
@@ -8,6 +8,7 @@ import { departmentHeadMenuItems } from "@/lib/nav-config";
 
 export default function DepartmentHeadLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -27,7 +28,10 @@ export default function DepartmentHeadLayout({ children }: { children: React.Rea
 
         if (user.role !== "department_head") {
           router.push("/login");
+          return;
         }
+
+        setIsAuthorized(true);
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -37,6 +41,13 @@ export default function DepartmentHeadLayout({ children }: { children: React.Rea
     syncUser();
   }, [router]);
 
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">

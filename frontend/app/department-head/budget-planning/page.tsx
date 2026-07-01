@@ -159,37 +159,6 @@ export default function CategoryBudgetPage() {
             </div>
           </div>
 
-          {/* Budget Utilization Chart */}
-          {categoryBudgets.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <h3 className="text-base font-bold text-secondary mb-4">Budget Utilization by Category</h3>
-              <div className="space-y-4">
-                {categoryBudgets.map((cat) => {
-                  const utilization = cat.allocated > 0
-                    ? ((cat.reserved + cat.spent) / cat.allocated) * 100
-                    : 0;
-                  return (
-                    <div key={cat.id}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold text-secondary">{cat.category}</span>
-                        <span className="text-sm text-secondary/60">{utilization.toFixed(1)}%</span>
-                      </div>
-                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${Math.min(utilization, 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between mt-1 text-xs text-secondary/50">
-                        <span>₱{cat.allocated.toLocaleString()} allocated</span>
-                        <span>₱{cat.available.toLocaleString()} available</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
 

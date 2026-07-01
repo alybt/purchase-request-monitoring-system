@@ -253,6 +253,67 @@ export default function ViewPRModal({
             <p className="text-sm font-medium text-secondary">{pr.dueDate}</p>
           </div>
 
+          {/* Procurement Information */}
+          {pr.orderedAt && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden mt-4">
+              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                <p className="text-xs font-bold text-secondary uppercase tracking-wider">
+                  Procurement Information
+                </p>
+              </div>
+              <div className="p-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Supplier Name
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {pr.supplierName || "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Purchase Order No.
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {pr.purchaseOrderNumber || "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Expected Delivery
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {pr.expectedDeliveryDate || "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Ordered By
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {pr.orderer ? `${pr.orderer.first_name} ${pr.orderer.last_name}` : "Not specified"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Ordered On
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {new Date(pr.orderedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    Remarks
+                  </p>
+                  <p className="text-sm font-medium text-secondary">
+                    {pr.procurementRemarks || "Not specified"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Line Items Detail */}
           {pr.lineItems && pr.lineItems.length > 0 && (
             <div>

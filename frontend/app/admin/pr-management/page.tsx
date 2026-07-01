@@ -8,6 +8,8 @@ import PRTableWithActions from "@/features/purchase-requests/components/PRTableW
 import ViewPRModal from "@/features/purchase-requests/components/ViewPRModal";
 import PRFormModal from "@/features/purchase-requests/components/PRFormModal";
 import DeletePRModal from "@/features/purchase-requests/components/DeletePRModal";
+import MarkOrderedModal from "@/features/purchase-requests/components/MarkOrderedModal";
+import StatusConfirmationModal from "@/features/purchase-requests/components/StatusConfirmationModal";
 import { getPurchaseRequests, updatePurchaseRequest, bulkDeletePurchaseRequests, getPurchaseRequestsSummary, uploadPRAttachments } from "@/services/purchase-requests.service";
 import type { PRData } from "@/services/purchase-requests.service";
 
@@ -28,6 +30,7 @@ export default function AdminPRManagementPage() {
   const [viewPR, setViewPR] = useState<PRData | null>(null);
   const [editPR, setEditPR] = useState<PRData | null>(null);
   const [showDelete, setShowDelete] = useState(false);
+  const [markOrderedPR, setMarkOrderedPR] = useState<PRData | null>(null);
   
   const [actionModal, setActionModal] = useState<{
     isOpen: boolean;
@@ -41,6 +44,23 @@ export default function AdminPRManagementPage() {
   useEffect(() => {
     fetchData();
   }, [search, departmentFilter, activeTab]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const prIdParam = urlParams.get('prId');
+      if (prIdParam && prs.length > 0) {
+        const targetPr = prs.find(p => p.id.toString() === prIdParam);
+        if (targetPr) {
+          setViewPR(targetPr);
+          
+          // Remove the parameter from URL to prevent reopening on reload
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }
+    }
+  }, [prs]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -65,7 +85,19 @@ export default function AdminPRManagementPage() {
       if (data.files && data.files.length > 0) {
         updatedPR = await uploadPRAttachments(editPR.id, data.files);
       }
-      setPrs((prev) => prev.map((p) => (p.id === editPR.id ? updatedPR : p)));
+      
+      // If status changed, remove from current view and update counts
+      if (updatedPR.status !== editPR.status) {
+        setPrs((prev) => prev.filter((p) => p.id !== editPR.id));
+        setTabCounts((prev) => ({
+          ...prev,
+          [editPR.status]: Math.max(0, (prev[editPR.status] || 0) - 1),
+          [updatedPR.status]: (prev[updatedPR.status] || 0) + 1
+        }));
+      } else {
+        setPrs((prev) => prev.map((p) => (p.id === editPR.id ? updatedPR : p)));
+      }
+      
       setEditPR(null);
     } catch (err) {
       console.error(err);
@@ -90,8 +122,11 @@ export default function AdminPRManagementPage() {
     }
   };
 
-  const executeStatusTransition = async () => {
+  const executeStatusTransition = async (remarksArg?: string) => {
     if (!actionModal.prId || !actionModal.targetStatus) return;
+    const finalRemarks = remarksArg !== undefined ? remarksArg : actionRemarks;
+    
+    // We let StatusConfirmationModal handle its own isSubmitting state, but we keep this just in case
     setIsProcessingAction(true);
     try {
       const prToUpdate = prs.find((p) => p.id === actionModal.prId);
@@ -101,7 +136,7 @@ export default function AdminPRManagementPage() {
         description: prToUpdate.description || "",
         amount: prToUpdate.amount,
         status: actionModal.targetStatus,
-        remarks: actionRemarks.trim(),
+        remarks: finalRemarks.trim(),
       });
       
       // Update local state without fetching entirely
@@ -115,6 +150,7 @@ export default function AdminPRManagementPage() {
       closeActionModal();
     } catch (err) {
       console.error(err);
+      throw err;
     } finally {
       setIsProcessingAction(false);
     }
@@ -128,6 +164,29 @@ export default function AdminPRManagementPage() {
   const closeActionModal = () => {
     setActionModal({ isOpen: false, prId: null, actionName: "", targetStatus: "" });
     setActionRemarks("");
+  };
+
+  const handleMarkOrderedSubmit = async (data: any) => {
+    if (!markOrderedPR) return;
+    try {
+      await updatePurchaseRequest(markOrderedPR.id, {
+        description: markOrderedPR.description || "",
+        amount: markOrderedPR.amount,
+        ...data
+      });
+      
+      // Update local state
+      setPrs((prev) => prev.filter((p) => p.id !== markOrderedPR.id));
+      setTabCounts((prev) => ({
+        ...prev,
+        [activeTab]: Math.max(0, (prev[activeTab] || 0) - 1),
+        Ordered: (prev.Ordered || 0) + 1
+      }));
+      setMarkOrderedPR(null);
+    } catch (err) {
+      console.error(err);
+      throw err; // So the modal knows it failed
+    }
   };
 
   const renderWorkflowActions = (pr: PRData) => {
@@ -162,7 +221,7 @@ export default function AdminPRManagementPage() {
       ),
       Approved: (
         <>
-          <button onClick={() => openActionModal(pr.id, "Mark as Ordered", "Ordered")} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Mark Ordered">
+          <button onClick={() => setMarkOrderedPR(pr)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Mark Ordered">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
           </button>
           <div className="w-px h-5 bg-slate-200 mx-1" />
@@ -358,78 +417,24 @@ export default function AdminPRManagementPage() {
 
       {/* Action Confirmation Modal */}
       {actionModal.isOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-lg text-secondary">
-                {actionModal.actionName} Purchase Request
-              </h3>
-              <button
-                onClick={closeActionModal}
-                disabled={isProcessingAction}
-                className="text-slate-400 hover:text-secondary disabled:opacity-50"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="p-6">
-              <p className="text-secondary/80 mb-6">
-                Are you sure you want to {actionModal.actionName.toLowerCase()} this Purchase Request?
-              </p>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-semibold text-secondary">Remarks (Optional)</label>
-                  <span className={`text-xs ${actionRemarks.length > 500 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                    {actionRemarks.length} / 500
-                  </span>
-                </div>
-                <textarea
-                  className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 resize-none transition-all ${
-                    actionRemarks.length > 500 
-                      ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' 
-                      : 'border-slate-200 focus:ring-primary/20 focus:border-primary'
-                  }`}
-                  rows={4}
-                  placeholder="Add an optional remark explaining this action..."
-                  value={actionRemarks}
-                  onChange={(e) => setActionRemarks(e.target.value)}
-                  disabled={isProcessingAction}
-                />
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button
-                onClick={closeActionModal}
-                disabled={isProcessingAction}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-secondary border border-slate-200 hover:bg-white transition-colors shadow-sm disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={executeStatusTransition}
-                disabled={isProcessingAction || actionRemarks.length > 500}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessingAction ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Processing...
-                  </>
-                ) : (
-                  actionModal.actionName
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <StatusConfirmationModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.targetStatus as any}
+          onClose={closeActionModal}
+          onConfirm={async (remarks) => {
+            setActionRemarks(remarks);
+            await executeStatusTransition(remarks);
+          }}
+        />
+      )}
+      {/* Mark as Ordered Modal */}
+      {markOrderedPR && (
+        <MarkOrderedModal
+          isOpen={!!markOrderedPR}
+          pr={markOrderedPR}
+          onClose={() => setMarkOrderedPR(null)}
+          onSubmit={handleMarkOrderedSubmit}
+        />
       )}
     </div>
   );

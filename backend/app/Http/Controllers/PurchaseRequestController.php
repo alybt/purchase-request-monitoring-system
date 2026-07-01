@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use App\Services\NotificationService;
 
 class PurchaseRequestController extends Controller
 {
@@ -17,7 +18,7 @@ class PurchaseRequestController extends Controller
     {
         try {
             $user = $request->user();
-            $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory', 'attachments']);
+            $query = PurchaseRequest::with(['requester', 'approver', 'department', 'category', 'items', 'statusHistory', 'attachments', 'orderer']);
 
             // Restrict Department Head to their own department's PRs
             if ($user && $user->isDepartmentHead()) {
@@ -222,6 +223,10 @@ class PurchaseRequestController extends Controller
                     'remarks' => $isDraft ? 'Draft created.' : 'Purchase Request pending approval.',
                 ]);
 
+                if (!$isDraft) {
+                    NotificationService::notifyAdminsNewPR($pr);
+                }
+
                 return $pr;
             });
 
@@ -245,7 +250,7 @@ class PurchaseRequestController extends Controller
     public function show($id)
     {
         try {
-            $pr = PurchaseRequest::with(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments'])->find($id);
+            $pr = PurchaseRequest::with(['items', 'requester', 'approver', 'department', 'category', 'statusHistory', 'attachments', 'orderer'])->find($id);
 
             if (!$pr) {
                 return response()->json([
@@ -329,6 +334,17 @@ class PurchaseRequestController extends Controller
                 if ($request->has('department_id')) $updateData['department_id'] = $request->input('department_id');
                 if ($request->has('category_id')) $updateData['category_id'] = $request->input('category_id');
 
+                // Procurement fields
+                if ($request->has('supplier_name')) $updateData['supplier_name'] = $request->input('supplier_name');
+                if ($request->has('purchase_order_number')) $updateData['purchase_order_number'] = $request->input('purchase_order_number');
+                if ($request->has('expected_delivery_date')) $updateData['expected_delivery_date'] = $request->input('expected_delivery_date');
+                if ($request->has('procurement_remarks')) $updateData['procurement_remarks'] = $request->input('procurement_remarks');
+
+                if (isset($updateData['status']) && $updateData['status'] === 'Ordered' && $oldStatus !== 'Ordered') {
+                    $updateData['ordered_at'] = now();
+                    $updateData['ordered_by'] = $request->user()?->id;
+                }
+
                 $pr->update($updateData);
 
                 if ($request->has('line_items')) {
@@ -406,6 +422,12 @@ class PurchaseRequestController extends Controller
                         'changed_by' => $request->user()?->id ?? $pr->requested_by,
                         'remarks' => $request->input('remarks', "Status updated to {$newStatus}"),
                     ]);
+                    
+                    if ($newStatus === 'Pending' && in_array($oldStatus, ['Draft', 'Rejected'])) {
+                        NotificationService::notifyAdminsNewPR($pr);
+                    } else if ($newStatus !== 'Draft') {
+                        NotificationService::notifyDeptHeadStatusChange($pr, $newStatus, $request->input('remarks'));
+                    }
                 }
 
                 if (in_array($newStatus, ['Released', 'Received', 'Completed']) && !in_array($oldStatus, ['Released', 'Received', 'Completed'])) {

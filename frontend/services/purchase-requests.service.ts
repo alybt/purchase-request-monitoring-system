@@ -67,6 +67,15 @@ export interface PRData {
   lineItems?: LineItem[];
   statusHistory?: StatusHistoryItem[];
   attachments?: Attachment[];
+
+  // Procurement Tracking
+  supplierName?: string | null;
+  purchaseOrderNumber?: string | null;
+  expectedDeliveryDate?: string | null;
+  procurementRemarks?: string | null;
+  orderedAt?: string | null;
+  orderedBy?: number | null;
+  orderer?: { id: number; first_name: string; last_name: string } | null;
 }
 
 export function mapBackendPRToFrontend(pr: any): PRData {
@@ -105,6 +114,15 @@ export function mapBackendPRToFrontend(pr: any): PRData {
       ...att,
       preview_url: att.file_path ? `http://127.0.0.1:8000/storage/${att.file_path}` : undefined
     })),
+    
+    // Procurement Fields
+    supplierName: pr.supplier_name || null,
+    purchaseOrderNumber: pr.purchase_order_number || null,
+    expectedDeliveryDate: pr.expected_delivery_date ? pr.expected_delivery_date.split("T")[0] : null,
+    procurementRemarks: pr.procurement_remarks || null,
+    orderedAt: pr.ordered_at || null,
+    orderedBy: pr.ordered_by || null,
+    orderer: pr.orderer || null,
   };
 }
 
@@ -117,6 +135,7 @@ export async function getPurchaseRequests(search = "", department = "", status =
   const response = await fetch(`${API_URL}/purchase-requests?${params.toString()}`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -132,6 +151,7 @@ export async function getPurchaseRequestsSummary(): Promise<Record<string, numbe
   const response = await fetch(`${API_URL}/purchase-requests/summary`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -147,6 +167,7 @@ export async function getPurchaseRequestDetails(id: string): Promise<PRData> {
   const response = await fetch(`${API_URL}/purchase-requests/${id}`, {
     method: "GET",
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
