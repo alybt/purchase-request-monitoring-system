@@ -31,6 +31,33 @@ class DepartmentTest extends TestCase
         $response->assertJsonCount(2, 'departments');
     }
 
+    public function test_can_filter_departments_by_fiscal_year_and_month(): void
+    {
+        $dept = Department::create(['name' => 'Monthly Dept', 'code' => 'MD']);
+        DepartmentBudget::create([
+            'department_id' => $dept->id,
+            'fiscal_year' => 2026,
+            'month' => 5,
+            'allocated_amount' => 10000,
+            'reserved_amount' => 0,
+            'spent_amount' => 0,
+        ]);
+        DepartmentBudget::create([
+            'department_id' => $dept->id,
+            'fiscal_year' => 2026,
+            'month' => 6,
+            'allocated_amount' => 5000,
+            'reserved_amount' => 0,
+            'spent_amount' => 0,
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/departments?fiscal_year=2026&month=6');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('departments.0.budget_allocation', 5000);
+        $response->assertJsonPath('month', 6);
+    }
+
     public function test_can_create_department(): void
     {
         $response = $this->actingAs($this->admin, 'sanctum')->postJson('/api/departments', [

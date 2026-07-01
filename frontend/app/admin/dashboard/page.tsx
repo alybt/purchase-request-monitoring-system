@@ -13,33 +13,93 @@ import type { PRData } from "@/services/purchase-requests.service";
 
 const icons = {
   budget: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 4v16M9 6h5a3 3 0 010 6H9M6 9h9M6 12h9"
+      />
     </svg>
   ),
   allocated: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
   available: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+      />
     </svg>
   ),
   pending: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
   approved: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
   rejected: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
 };
@@ -47,7 +107,7 @@ const icons = {
 export default function AdminDashboardPage() {
   const [prs, setPrs] = useState<PRData[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const safeNum = (val: any): number => {
     if (val === null || val === undefined || val === "") return 0;
     const num = Number(val);
@@ -56,19 +116,26 @@ export default function AdminDashboardPage() {
 
   const [companyBudget, setCompanyBudget] = useState(0);
   const [allocatedBudget, setAllocatedBudget] = useState(0);
-  const availableBudget = Math.max(0, safeNum(companyBudget) - safeNum(allocatedBudget));
+  const availableBudget = Math.max(
+    0,
+    safeNum(companyBudget) - safeNum(allocatedBudget),
+  );
 
   useEffect(() => {
     const year = new Date().getFullYear();
     Promise.all([
       getPurchaseRequests().catch(() => []),
       getCompanyBudget(year).catch(() => null),
-      getBudgetSummary(year).catch(() => null)
+      getBudgetSummary(year).catch(() => null),
     ])
       .then(([prsData, cbData, summaryData]) => {
         setPrs(prsData as PRData[]);
-        if (cbData) setCompanyBudget(safeNum(cbData.total_budget) + safeNum(cbData.carry_forward));
-        if (summaryData) setAllocatedBudget(safeNum(summaryData.total_allocated));
+        if (cbData)
+          setCompanyBudget(
+            safeNum(cbData.total_budget) + safeNum(cbData.carry_forward),
+          );
+        if (summaryData)
+          setAllocatedBudget(safeNum(summaryData.total_allocated));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -80,13 +147,15 @@ export default function AdminDashboardPage() {
 
   // Calculate Purchase Request Trends by Category
   const categoryCounts: Record<string, number> = {};
-  prs.filter(pr => pr.status !== "Draft").forEach(pr => {
-    const categoryName = pr.category || "Uncategorized";
-    categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
-  });
+  prs
+    .filter((pr) => pr.status !== "Draft")
+    .forEach((pr) => {
+      const categoryName = pr.category || "Uncategorized";
+      categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
+    });
 
   const categoryTrend = Object.keys(categoryCounts)
-    .map(category => ({
+    .map((category) => ({
       label: category,
       value: categoryCounts[category] || 0,
     }))
@@ -107,21 +176,59 @@ export default function AdminDashboardPage() {
       />
 
       {loading ? (
-        <div className="p-8 text-center text-secondary/50">Loading dashboard data...</div>
+        <div className="p-8 text-center text-secondary/50">
+          Loading dashboard data...
+        </div>
       ) : (
         <>
           {/* Budget Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard title="Total Company Budget" value={`₱${safeNum(companyBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.budget} colorScheme="primary" subtitle={`Fiscal Year ${new Date().getFullYear()}`} />
-            <StatCard title="Total Allocated Budget" value={`₱${safeNum(allocatedBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.allocated} colorScheme="accent" subtitle="To departments" />
-            <StatCard title="Total Available Budget" value={`₱${safeNum(availableBudget).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} icon={icons.available} colorScheme="gold" subtitle="Unallocated" />
+            <StatCard
+              title="Total Company Budget"
+              value={`₱${safeNum(companyBudget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              icon={icons.budget}
+              colorScheme="primary"
+              subtitle={`Fiscal Year ${new Date().getFullYear()}`}
+            />
+            <StatCard
+              title="Total Allocated Budget"
+              value={`₱${safeNum(allocatedBudget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              icon={icons.allocated}
+              colorScheme="accent"
+              subtitle="To departments"
+            />
+            <StatCard
+              title="Total Available Budget"
+              value={`₱${safeNum(availableBudget).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              icon={icons.available}
+              colorScheme="gold"
+              subtitle="Unallocated"
+            />
           </div>
 
           {/* PR Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard title="Pending Requests" value={pendingRequests} icon={icons.pending} colorScheme="gold" subtitle="Awaiting review" />
-            <StatCard title="Approved Requests" value={approvedRequests} icon={icons.approved} colorScheme="accent" subtitle="Ready for procurement" />
-            <StatCard title="Rejected Requests" value={rejectedRequests} icon={icons.rejected} colorScheme="red" subtitle="Declined" />
+            <StatCard
+              title="Pending Requests"
+              value={pendingRequests}
+              icon={icons.pending}
+              colorScheme="gold"
+              subtitle="Awaiting review"
+            />
+            <StatCard
+              title="Approved Requests"
+              value={approvedRequests}
+              icon={icons.approved}
+              colorScheme="accent"
+              subtitle="Ready for procurement"
+            />
+            <StatCard
+              title="Rejected Requests"
+              value={rejectedRequests}
+              icon={icons.rejected}
+              colorScheme="red"
+              subtitle="Declined"
+            />
           </div>
 
           {/* Charts Row */}
@@ -140,8 +247,13 @@ export default function AdminDashboardPage() {
           {/* Recent Activity Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-secondary">Recent Purchase Requests</h3>
-              <Link href="/admin/purchase-requests" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+              <h3 className="text-base font-bold text-secondary">
+                Recent Purchase Requests
+              </h3>
+              <Link
+                href="/admin/purchase-requests"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
                 View All →
               </Link>
             </div>
@@ -159,15 +271,28 @@ export default function AdminDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {prs.slice(0, 5).map((pr) => (
-                    <tr key={pr.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 font-bold text-primary">{pr.prNumber}</td>
-                      <td className="px-6 py-3 text-secondary">{pr.requestedBy}</td>
-                      <td className="px-6 py-3 text-secondary/70">{pr.department}</td>
-                      <td className="px-6 py-3 font-semibold text-secondary">₱{pr.amount.toLocaleString()}</td>
+                    <tr
+                      key={pr.id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-6 py-3 font-bold text-primary">
+                        {pr.prNumber}
+                      </td>
+                      <td className="px-6 py-3 text-secondary">
+                        {pr.requestedBy}
+                      </td>
+                      <td className="px-6 py-3 text-secondary/70">
+                        {pr.department}
+                      </td>
+                      <td className="px-6 py-3 font-semibold text-secondary">
+                        ₱{pr.amount.toLocaleString()}
+                      </td>
                       <td className="px-6 py-3">
                         <StatusBadge status={pr.status} />
                       </td>
-                      <td className="px-6 py-3 text-secondary/50 text-xs">{pr.dateRequested}</td>
+                      <td className="px-6 py-3 text-secondary/50 text-xs">
+                        {pr.dateRequested}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
